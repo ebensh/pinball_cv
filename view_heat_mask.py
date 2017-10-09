@@ -12,7 +12,7 @@ parser.add_argument('--debug', default=True, type=bool, help='Display processing
 args = parser.parse_args()
 
 debug_step = 0
-def display_debug_step(img, title=None):
+def display_image(img, title=None, show=args.debug):
   global debug_step
   if args.debug:
     if title is None:
@@ -26,15 +26,15 @@ def display_debug_step(img, title=None):
 
 def main():
   img = cv2.imread(args.infile)
-  display_debug_step(img, 'original')
+  display_image(img, 'original')
 
   # Apply effects here to see outputs.
   _, img = cv2.threshold(img, 3, 255, cv2.THRESH_BINARY)
-  display_debug_step(img)
+  display_image(img)
   
   kernel = np.ones((5, 5), np.uint8)
   img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
-  display_debug_step(img)
+  display_image(img)
 
   if args.outfile:
     cv2.imwrite(args.outfile, img)
