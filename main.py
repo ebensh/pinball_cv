@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 def main():
-  cap = cv2.VideoCapture('pinball.mp4')
+  cap = cv2.VideoCapture('short_clip.mp4')
   base_frame = None
 
   cv2.namedWindow('base_frame', cv2.WINDOW_NORMAL)
@@ -25,7 +25,6 @@ def main():
     cv2.imshow('p1', frame)
 
     _, frame = cv2.threshold(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 100, 255, cv2.THRESH_BINARY)
-    print frame
     cv2.imshow('p2', frame)
 
     prev_frame = frame
