@@ -18,7 +18,7 @@ def main():
   #alphas = [0.2, 0.1, 0.05, 0.01, 0.001]
   #backgrounds = [np.float32(base_frame) for alpha in alphas]
 
-  alpha = 0.05
+  alpha = 0.2
   background_weighted = np.float32(base_frame)
   background_weighted_min = np.float32(base_frame)
   background_weighted_max = np.float32(base_frame)
