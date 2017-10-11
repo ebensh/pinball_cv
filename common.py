@@ -33,7 +33,7 @@ class FramePrinter(object):
       total_cols += cols
     total_cols += (len(self._images) - 1) * space
 
-    combined_image = np.zeros((rows + 30, total_cols, 3), dtype=np.uint8)
+    combined_image = np.zeros((rows, total_cols, 3), dtype=np.uint8)
     current_col = 0
     for img, caption in self._images:
       shape = img.shape
