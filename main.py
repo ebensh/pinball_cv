@@ -41,18 +41,6 @@ def main():
     frame_printer.add_image(frame, 'frame')
     frame_printer.add_image(frame_gray, 'frame gray')
 
-    # Create a mask for the unchanging background and subtract it away.
-    cv2.accumulateWeighted(frame_gray, dynamic_background, alpha)
-    background_difference = cv2.absdiff(frame_gray, cv2.convertScaleAbs(dynamic_background))
-    frame_printer.add_image(background_difference, 'frame_gray - dynamic_background')
-
-    frame_gray_float = (frame_gray / 255.0).astype(np.float32)
-    future_frame_gray_float = (frame_buffer[1][1] / 255.0).astype(np.float32)
-    (point_x, point_y), value = cv2.phaseCorrelate(frame_gray_float, future_frame_gray_float)
-    print point_x, point_y, value
-    cv2.circle(frame, point, 30, (255, 255, 255))
-    frame_printer.add_image(frame, 'translation point')
-    
     if False:
       # We want to accumulate large values for pixels that are often different
       # in the next several frames, to detect lights that go on or off.
@@ -93,6 +81,19 @@ def main():
       # print best_guess_loc
       # cv2.circle(frame, best_guess_loc, 30, (255, 255, 255))
       # common.display_image(frame, 'frame masked')
+    
+    if False:
+      # Create a mask for the unchanging background and subtract it away.
+      cv2.accumulateWeighted(frame_gray, dynamic_background, alpha)
+      background_difference = cv2.absdiff(frame_gray, cv2.convertScaleAbs(dynamic_background))
+      frame_printer.add_image(background_difference, 'frame_gray - dynamic_background')
+
+      frame_gray_float = (frame_gray / 255.0).astype(np.float32)
+      future_frame_gray_float = (frame_buffer[1][1] / 255.0).astype(np.float32)
+      (point_x, point_y), value = cv2.phaseCorrelate(frame_gray_float, future_frame_gray_float)
+      print point_x, point_y, value
+      cv2.circle(frame, point, 30, (255, 255, 255))
+      frame_printer.add_image(frame, 'translation point')
 
     combined_image = frame_printer.get_combined_image()
     common.display_image(combined_image, 'combined')
