@@ -16,7 +16,7 @@ def main():
   #print "Background: {0}, {1}".format(background.shape, background.dtype)
   #print "Mask: {0}, {1}".format(mask.shape, mask.dtype)
   
-  FRAME_BUFFER_SIZE = 30
+  FRAME_BUFFER_SIZE = 10
   frame_buffer = deque([], maxlen=FRAME_BUFFER_SIZE)
   
   # Loop until the frame buffer is full at the start.
@@ -46,45 +46,53 @@ def main():
     background_difference = cv2.absdiff(frame_gray, cv2.convertScaleAbs(dynamic_background))
     frame_printer.add_image(background_difference, 'frame_gray - dynamic_background')
 
-    # We want to accumulate large values for pixels that are often different
-    # in the next several frames, to detect lights that go on or off.
-    # Once we normalize this accumulation the ball should be relatively small,
-    # as it is in motion.
-    base_frame_gray = frame_buffer[1][1]  # Gray image three frames forward.
-    #minimum_difference = np.full(base_frame_gray.shape, 255, dtype=np.uint8)
-    maximum_difference = np.zeros(base_frame_gray.shape, dtype=np.uint8)
-    #accumulated_difference = np.zeros(base_frame_gray.shape, dtype=np.float64)
-    for _, future_frame_gray in itertools.islice(frame_buffer, 2, None):
-      diff = cv2.absdiff(base_frame_gray, future_frame_gray)
-      #minimum_difference = cv2.min(minimum_difference, diff)
-      maximum_difference = cv2.max(maximum_difference, diff)
-      #cv2.accumulate(diff, accumulated_difference)
-    #delta_difference = maximum_difference - minimum_difference
-    #delta_difference *= 255.0 / delta_difference.max()
-    #accumulated_difference = cv2.convertScaleAbs(accumulated_difference)
-    #frame_printer.add_image(minimum_difference, 'minimum difference')
-    frame_printer.add_image(maximum_difference, 'maximum difference')
-    #frame_printer.add_image(delta_difference, 'delta difference')
-    #frame_printer.add_image(accumulated_difference, 'accumulated difference')
-
-    # Mask away the light changes we see in the future.
-    _, future_difference_mask = cv2.threshold(maximum_difference, 25, 255, cv2.THRESH_BINARY_INV)
-    frame_printer.add_image(future_difference_mask, 'future difference mask')
-
-    foreground_mask = background_difference
-    foreground_mask *= 255.0 / foreground_mask.max()
-    foreground_mask = cv2.bitwise_and(foreground_mask,
-                                      foreground_mask,
-                                      mask=future_difference_mask)
-    _, foreground_mask = cv2.threshold(foreground_mask, 75, 255, cv2.THRESH_BINARY)
-    frame_printer.add_image(foreground_mask, 'foreground_mask')
-
-    frame_printer.add_image(cv2.bitwise_and(frame, frame, mask=foreground_mask), 'foreground')
+    frame_gray_float = (frame_gray / 255.0).astype(np.float32)
+    future_frame_gray_float = (frame_buffer[1][1] / 255.0).astype(np.float32)
+    (point_x, point_y), value = cv2.phaseCorrelate(frame_gray_float, future_frame_gray_float)
+    print point_x, point_y, value
+    cv2.circle(frame, point, 30, (255, 255, 255))
+    frame_printer.add_image(frame, 'translation point')
     
-    # _, _, _, best_guess_loc = cv2.minMaxLoc(frame_gray)
-    # print best_guess_loc
-    # cv2.circle(frame, best_guess_loc, 30, (255, 255, 255))
-    # common.display_image(frame, 'frame masked')
+    if False:
+      # We want to accumulate large values for pixels that are often different
+      # in the next several frames, to detect lights that go on or off.
+      # Once we normalize this accumulation the ball should be relatively small,
+      # as it is in motion.
+      base_frame_gray = frame_buffer[1][1]  # Gray image three frames forward.
+      #minimum_difference = np.full(base_frame_gray.shape, 255, dtype=np.uint8)
+      maximum_difference = np.zeros(base_frame_gray.shape, dtype=np.uint8)
+      #accumulated_difference = np.zeros(base_frame_gray.shape, dtype=np.float64)
+      for _, future_frame_gray in itertools.islice(frame_buffer, 2, None):
+        diff = cv2.absdiff(base_frame_gray, future_frame_gray)
+        #minimum_difference = cv2.min(minimum_difference, diff)
+        maximum_difference = cv2.max(maximum_difference, diff)
+        #cv2.accumulate(diff, accumulated_difference)
+        #delta_difference = maximum_difference - minimum_difference
+        #delta_difference *= 255.0 / delta_difference.max()
+        #accumulated_difference = cv2.convertScaleAbs(accumulated_difference)
+        #frame_printer.add_image(minimum_difference, 'minimum difference')
+      frame_printer.add_image(maximum_difference, 'maximum difference')
+      #frame_printer.add_image(delta_difference, 'delta difference')
+      #frame_printer.add_image(accumulated_difference, 'accumulated difference')
+
+      # Mask away the light changes we see in the future.
+      _, future_difference_mask = cv2.threshold(maximum_difference, 25, 255, cv2.THRESH_BINARY_INV)
+      frame_printer.add_image(future_difference_mask, 'future difference mask')
+
+      foreground_mask = background_difference
+      foreground_mask *= 255.0 / foreground_mask.max()
+      foreground_mask = cv2.bitwise_and(foreground_mask,
+                                        foreground_mask,
+                                        mask=future_difference_mask)
+      _, foreground_mask = cv2.threshold(foreground_mask, 75, 255, cv2.THRESH_BINARY)
+      frame_printer.add_image(foreground_mask, 'foreground_mask')
+
+      frame_printer.add_image(cv2.bitwise_and(frame, frame, mask=foreground_mask), 'foreground')
+    
+      # _, _, _, best_guess_loc = cv2.minMaxLoc(frame_gray)
+      # print best_guess_loc
+      # cv2.circle(frame, best_guess_loc, 30, (255, 255, 255))
+      # common.display_image(frame, 'frame masked')
 
     combined_image = frame_printer.get_combined_image()
     common.display_image(combined_image, 'combined')
