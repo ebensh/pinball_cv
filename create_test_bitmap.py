@@ -28,26 +28,26 @@ def main():
                 [0, 0, 200, 210],
                 [0, 0, 180, 190]]
 
-  # Progressively darker series of imgs.
-  num_frames = 5
-  frames = np.zeros((num_frames,) + img.shape)  # Prepend a 4th dimension.
-  for i in xrange(num_frames):
-    frames[i,:,:,:] = img / (num_frames * i)
-
   def print_by_channel(img):
     rows, cols, channels = img.shape
     for channel in xrange(channels):
       print img[:,:,channel]
+  
+  # Progressively darker series of imgs.
+  num_frames = 5
+  frames = np.zeros((num_frames,) + img.shape)  # Prepend a 4th dimension.
+  for i in xrange(num_frames):
+    frames[i] = img / (i + 1)
 
   # Manual method to verify against (golden standard but slow).
   def concatenate_frames(frames):
     rows, cols, channels = frames[0].shape
     num_frames = len(frames)
     result = np.zeros((rows, cols * num_frames, channels))
-    for frame in frames:
+    for i, frame in enumerate(frames):
       result[:, i*cols:(i+1)*cols, :] = frame
     return result
-      
+
 
   # Rolling axis 0 rotates the rows, putting the last row (darkest) at the top.
   #img = np.roll(img, 1, 0)
@@ -60,10 +60,11 @@ def main():
   #print_by_channel(np.roll(img, 1, 2))
   #img = np.roll(img, 1, 2)
 
-  print_by_channel(concatenate_frames(frames))
-
-  cv2.imwrite(args.outfile, img)
-  
+  # Test rolling one frame backwards.
+  frames = np.roll(frames, -1, 0)
+  #concatenated_frames = concatenate_frames(frames)
+  #print_by_channel(concatenated_frames)
+  cv2.imwrite(args.outfile, concatenate_frames(frames))
   
 
 if __name__ == '__main__':
