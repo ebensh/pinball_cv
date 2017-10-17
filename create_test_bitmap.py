@@ -4,9 +4,9 @@ import argparse
 import cv2
 import numpy as np
 
-def main():
-  # Other useful test: np.reshape(np.arange(5*4*3), (5, 4, 3))
+import common
 
+def main():
   # The test image is vertical bars of blue, green, red, gray.
   img = np.zeros((4, 4, 3), dtype=np.uint8)
 
@@ -28,26 +28,13 @@ def main():
                 [0, 0, 200, 210],
                 [0, 0, 180, 190]]
 
-  def print_by_channel(img):
-    rows, cols, channels = img.shape
-    for channel in xrange(channels):
-      print img[:,:,channel]
-  
+  # Useful for testing: np.reshape(np.arange(5*4*3), (5, 4, 3))
   # Progressively darker series of imgs.
   num_frames = 5
-  frames = np.zeros((num_frames,) + img.shape)  # Prepend a 4th dimension.
+  frame_buffer = common.FrameBuffer(num_frames, img.shape)
   for i in xrange(num_frames):
-    frames[i] = img / (i + 1)
-
-  # Manual method to verify against (golden standard but slow).
-  def concatenate_frames(frames):
-    rows, cols, channels = frames[0].shape
-    num_frames = len(frames)
-    result = np.zeros((rows, cols * num_frames, channels))
-    for i, frame in enumerate(frames):
-      result[:, i*cols:(i+1)*cols, :] = frame
-    return result
-
+    frame_buffer.append(img / (i + 1))
+  frames_flat, frames_gray_flat = frame_buffer.get_buffers()
 
   # Rolling axis 0 rotates the rows, putting the last row (darkest) at the top.
   #img = np.roll(img, 1, 0)
@@ -61,10 +48,10 @@ def main():
   #img = np.roll(img, 1, 2)
 
   # Test rolling one frame backwards.
-  frames = np.roll(frames, -1, 0)
+  #frames = np.roll(frames, -1, 0)
   #concatenated_frames = concatenate_frames(frames)
   #print_by_channel(concatenated_frames)
-  cv2.imwrite(args.outfile, concatenate_frames(frames))
+  cv2.imwrite(args.outfile, frames_flat)
   
 
 if __name__ == '__main__':
