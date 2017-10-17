@@ -36,65 +36,57 @@ def get_blob_detector():
 
 
 def main():
-  cap = cv2.VideoCapture(args.infile)
-  
-  FRAME_BUFFER_SIZE = 10
   BLEND_ALPHA = 0.33
-  frames_past = deque([], maxlen=FRAME_BUFFER_SIZE)
-  frames_future = deque([], maxlen=FRAME_BUFFER_SIZE)
+  CURRENT_FRAME_INDEX = 10
+  FRAME_BUFFER_SIZE = 21
 
+  cap = cv2.VideoCapture(args.infile)
   detector = get_blob_detector()
-  
-  # Loop until the frame buffers are full at the start.
-  while cap.isOpened() and len(frames_past) < FRAME_BUFFER_SIZE:
-    grabbed, raw_frame = cap.read()
-    if not grabbed: break
-    frames_past.append((raw_frame, cv2.cvtColor(raw_frame, cv2.COLOR_BGR2GRAY)))
-  while cap.isOpened() and len(frames_future) < FRAME_BUFFER_SIZE:
-    grabbed, raw_frame = cap.read()
-    if not grabbed: break
-    frames_future.append((raw_frame, cv2.cvtColor(raw_frame, cv2.COLOR_BGR2GRAY)))
 
-  cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
+  _, raw_frame = cap.read()
+  frame_buffer = common.FrameBuffer(FRAME_BUFFER_SIZE, raw_frame.shape)
+  
+  # Loop until the frame buffer is full at the start.
+  for i in xrange(FRAME_BUFFER_SIZE):
+    if not cap.isOpened(): break
+    grabbed, raw_frame = cap.read()
+    if not grabbed: break
+    frame_buffer.append(raw_frame)
+
+  #cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
+  #cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
+  frame_count = 0
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
-    current_frame, current_frame_gray = frames_future.popleft()
-    frames_future.append((raw_frame, cv2.cvtColor(raw_frame, cv2.COLOR_BGR2GRAY)))
+    frame_count += 1
 
+    frame_buffer.append(raw_frame)
     frame_printer = common.FramePrinter()
 
-    accumulated_past = np.zeros(current_frame.shape, dtype=np.float64)
-    accumulated_future = np.zeros(current_frame.shape, dtype=np.float64)
-    min_past = np.full(current_frame_gray.shape, 255, dtype=np.uint8)
-    max_past = np.zeros(current_frame_gray.shape, dtype=np.uint8)
-    mean_past = np.zeros(current_frame.shape, dtype=np.float64)    
-    min_future = np.full(current_frame_gray.shape, 255, dtype=np.uint8)
-    max_future = np.zeros(current_frame_gray.shape, dtype=np.uint8)
-    mean_future = np.zeros(current_frame.shape, dtype=np.float64)
+    #past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
+    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)
+    common.display_image(cv2.hconcat(past_gray), 'combined', args.display_all_images)
+    #current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
+    #future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
 
+    #past_stats = common.get_named_statistics(past_gray)
+    #future_stats = common.NamedStatistics(future_gray)
+
+    #past_stats_printer = common.FramePrinter()
+    #common.print_statistics(past_stats, past_stats_printer)
+    #common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
     
-    # Accumulate the past by iterating -> and the future by iterating <- :)
-    # This is inefficient, but I want to see how the "pure" version works, only
-    # using the images in the past and future buffers. If we iteratively add the
-    # current frame there will be some (admittedly very small) noise from
-    # distant passed and future frames.
-    for past_frame, past_frame_gray in frames_past:
-      min_past = np.minimum(min_past, past_frame_gray)
-      max_past = np.maximum(max_past, past_frame_gray)
-      cv2.accumulate(past_frame, mean_past)
-      cv2.accumulateWeighted(past_frame, accumulated_past, BLEND_ALPHA)
-    for future_frame, future_frame_gray in reversed(frames_future):
-      min_future = np.minimum(min_future, future_frame_gray)
-      max_future = np.maximum(max_future, future_frame_gray)
-      cv2.accumulate(future_frame, mean_future)
-      cv2.accumulateWeighted(future_frame, accumulated_future, BLEND_ALPHA)
-    mean_past /= len(frames_past)
-    mean_future /= len(frames_future)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+      break
+    if frame_count >= 500: break
+    continue
+      
+      
+      
+    
     mean_past_gray = cv2.cvtColor(cv2.convertScaleAbs(mean_past), cv2.COLOR_BGR2GRAY)
     mean_future_gray = cv2.cvtColor(cv2.convertScaleAbs(mean_future), cv2.COLOR_BGR2GRAY)
-    delta_past = max_past - min_past
-    delta_future = max_future - min_future
 
     count_past = np.zeros(current_frame_gray.shape, dtype=np.uint8)
     count_future = np.zeros(current_frame_gray.shape, dtype=np.uint8)

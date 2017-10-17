@@ -1,3 +1,4 @@
+from collections import namedtuple
 import cv2
 import inspect
 import numpy as np
@@ -29,28 +30,59 @@ def display_image(img, title=None, show=True):
     cv2.imshow(title, img)
 
 
+# This is *INEFFICIENT* and is only intended for quick experimentation.
+# TODO(ebensh): Add a wrapper class around the named tuple.
+NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'delta', 'median', 'mean', 'variance'])
+def get_named_statistics(frames):
+  minimum = np.minimum.accumulate(frames)
+  maximum = np.maximum.accumulate(frames)
+  return NamedStatistics(
+    minimum=minimum,
+    maximum=maximum,
+    delta=maximum - minimum,
+    median=cv2.convertScaleAbs(np.median(frames, axis=0)),
+    mean=cv2.convertScaleAbs(np.mean(frames, axis=0, dtype=np.float64)),
+    variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
+
+def print_statistics(statistics, printer):
+  for field in statistics._fields:
+    printer.add_image(getattr(statistics, field), field)
+    
+    
 class FrameBuffer(object):
-  def __init__(self, num_frames=1, shape=(640, 480, 3)):
+  def __init__(self, num_frames=1, shape=(640, 480, 3), dtype=np.uint8):
     # Create our frame buffers. We don't store them together because while it
     # would make the rolling easier it would also require the gray version to
     # be stored with three channels.
-    self._frames = np.zeros((num_frames,) + shape)
-    self._frames_gray = np.zeros((num_frames,) + shape[0:2])
+    self._BUFFER_LENGTH = 2 * num_frames
+    self._num_frames = num_frames
+    self._idx = 0
+    self._shape = shape
+    self._frames = np.zeros((self._BUFFER_LENGTH,) + shape, dtype=dtype)
+    self._frames_gray = np.zeros((self._BUFFER_LENGTH,) + shape[0:2], dtype=dtype)
 
   def append(self, frame):
-    self._frames = np.roll(self._frames, -1, 0)
-    self._frames_gray = np.roll(self._frames_gray, -1, 0)
-    self._frames[-1] = frame
-    self._frames_gray[-1] = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    self._idx = (self._idx + 1) % self._BUFFER_LENGTH
+    idx_to_insert = (self._idx + self._num_frames) % self._BUFFER_LENGTH
+    self._frames[idx_to_insert] = frame
+    self._frames_gray[idx_to_insert] = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
   def get_view(self, start, stop, color=True):
     view = None
+    if start is None: start = 0
+    if stop is None: stop = self._num_frames
+    start += self._idx
+    stop += self._idx
     if color:
-      view = np.view(self._frames[start:stop])
+      view = self._frames.take(range(start, stop), axis=0, mode='wrap').view()
     else:
-      view = np.view(self._frames_gray[start:stop])
+      view = self._frames_gray.take(range(start, stop), axis=0, mode='wrap').view()
     view.setflags(write=False)
     return view
+
+  def get_shape(self, color=True):
+    if color: return self._shape
+    return self._shape[0:2]
 
   # Useful for debugging.
   def get_buffers(self):
