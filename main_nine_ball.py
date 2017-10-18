@@ -35,6 +35,33 @@ def get_blob_detector():
   return cv2.SimpleBlobDetector_create(params)
 
 
+def get_pinball_field_poly(frame):
+  # TODO: Replace this with something dynamic and intelligent, super cool, like
+  # they have in those movies with the people who type on the keyboard AT THE
+  # SAME TIME omfg that's so 1337. ... Til then just hardcode the values.
+  # Points here are X, Y, where top left is 0, 0.
+  return np.array([
+    (72, 191),   # top left
+    (231, 191),  # top right
+    (266, 539),  # bottom right
+    (36, 539),   # bottom left
+    (72, 191)])   # close back to first point  
+
+def get_pinball_field_mask(frame, pinball_field_poly):
+  mask = np.zeros(frame.shape[:2], dtype=np.uint8)  # Bool?
+  return cv2.fillConvexPoly(mask, pinball_field_poly, 255)
+
+def get_perspective_transform(frame, pinball_field_poly):
+  rows, cols = frame.shape[:2]
+  corners_of_frame = np.array([
+    (0, 0),            # top left
+    (cols-1, 0),       # top right
+    (cols-1, rows-1),  # bottom right
+    (0, rows-1)], dtype=np.float32)      # bottom left
+  print pinball_field_poly[:-1], corners_of_frame
+  return cv2.getPerspectiveTransform(pinball_field_poly[:-1].astype(np.float32), corners_of_frame)
+
+
 def main():
   BLEND_ALPHA = 0.33
   CURRENT_FRAME_INDEX = 10
@@ -45,6 +72,11 @@ def main():
 
   _, raw_frame = cap.read()
   frame_buffer = common.FrameBuffer(FRAME_BUFFER_SIZE, raw_frame.shape)
+
+  pinball_field_poly = get_pinball_field_poly(raw_frame)
+  pinball_field_mask = get_pinball_field_mask(raw_frame, pinball_field_poly)
+  pinball_perspective_transform = get_perspective_transform(raw_frame, pinball_field_poly)
+
   
   # Loop until the frame buffer is full at the start.
   for i in xrange(FRAME_BUFFER_SIZE):
@@ -60,19 +92,24 @@ def main():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
     frame_count += 1
+    if frame_count % 3 != 0: continue
 
     frame_buffer.append(raw_frame)
     frame_printer = common.FramePrinter()
 
     past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
     past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)    
-    #current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
+    current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
+
+    pinball_area = cv2.bitwise_and(current_frame, current_frame, mask=pinball_field_mask)
+    pinball_area = cv2.warpPerspective(pinball_area, pinball_perspective_transform, dsize=current_frame.shape[1::-1])
+    common.display_image(pinball_area, 'pinball_area')
     #future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
 
     past_stats = common.get_named_statistics(past_gray)
     #future_stats = common.NamedStatistics(future_gray)
 
-    if frame_count % 30 == 0:
+    if True:  # frame_count % 30 == 0:
       common.display_image(cv2.hconcat(past_gray), 'combined', args.display_all_images)
       past_stats_printer = common.FramePrinter()
       common.print_statistics(past_stats, past_stats_printer)
@@ -152,7 +189,7 @@ def main():
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
-  print 'Frames processed: %d', frame_count
+  print 'Frames processed: %d' % frame_count
 
   cap.release()
   cv2.destroyAllWindows()
