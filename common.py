@@ -37,7 +37,6 @@ NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'ptp', 'm
 def get_named_statistics(frames):
   minimum = np.amin(frames, axis=0)
   maximum = np.amax(frames, axis=0)
-  print frames.shape, minimum.shape, maximum.shape
   return NamedStatistics(
     minimum=minimum,
     maximum=maximum,

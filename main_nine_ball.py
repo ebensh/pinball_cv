@@ -152,7 +152,7 @@ def main():
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
-  print frame_count
+  print 'Frames processed: %d', frame_count
 
   cap.release()
   cv2.destroyAllWindows()
