@@ -41,9 +41,8 @@ def get_named_statistics(frames):
     minimum=minimum,
     maximum=maximum,
     ptp=maximum - minimum,
-    mean=cv2.convertScaleAbs(np.mean(frames, axis=0, dtype=np.float64)))
+    mean=np.mean(frames, axis=0, dtype=np.float64).astype(np.uint8))
     #median=cv2.convertScaleAbs(np.median(frames, axis=0)),
-    #
     #variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
 
 def print_statistics(statistics, printer):

@@ -58,14 +58,13 @@ def get_perspective_transform(frame, pinball_field_poly):
     (cols-1, 0),       # top right
     (cols-1, rows-1),  # bottom right
     (0, rows-1)], dtype=np.float32)      # bottom left
-  print pinball_field_poly[:-1], corners_of_frame
   return cv2.getPerspectiveTransform(pinball_field_poly[:-1].astype(np.float32), corners_of_frame)
 
 
 def main():
   BLEND_ALPHA = 0.33
-  CURRENT_FRAME_INDEX = 10
   FRAME_BUFFER_SIZE = 21
+  CURRENT_FRAME_INDEX = FRAME_BUFFER_SIZE/2
 
   cap = cv2.VideoCapture(args.infile)
   detector = get_blob_detector()
@@ -76,7 +75,6 @@ def main():
   pinball_field_poly = get_pinball_field_poly(raw_frame)
   pinball_field_mask = get_pinball_field_mask(raw_frame, pinball_field_poly)
   pinball_perspective_transform = get_perspective_transform(raw_frame, pinball_field_poly)
-
   
   # Loop until the frame buffer is full at the start.
   for i in xrange(FRAME_BUFFER_SIZE):
@@ -92,33 +90,76 @@ def main():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
     frame_count += 1
-    if frame_count % 3 != 0: continue
+    if frame_count % 2 != 0: continue  # Only process every 3rd frame.
 
-    frame_buffer.append(raw_frame)
     frame_printer = common.FramePrinter()
+    
+    pinball_area = cv2.bitwise_and(raw_frame, raw_frame, mask=pinball_field_mask)
+    pinball_area = cv2.warpPerspective(pinball_area, pinball_perspective_transform,
+                                       dsize=raw_frame.shape[1::-1])
+    common.display_image(pinball_area, 'pinball_area')
+    frame_buffer.append(pinball_area)
 
     past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
-    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)    
+    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)
     current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
-
-    pinball_area = cv2.bitwise_and(current_frame, current_frame, mask=pinball_field_mask)
-    pinball_area = cv2.warpPerspective(pinball_area, pinball_perspective_transform, dsize=current_frame.shape[1::-1])
-    common.display_image(pinball_area, 'pinball_area')
-    #future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
+    current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
+    future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
+    future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None, color=False)
 
     past_stats = common.get_named_statistics(past_gray)
-    #future_stats = common.NamedStatistics(future_gray)
+    future_stats = common.get_named_statistics(future_gray)
 
     if True:  # frame_count % 30 == 0:
-      common.display_image(cv2.hconcat(past_gray), 'combined', args.display_all_images)
+      common.display_image(
+          cv2.vconcat([cv2.hconcat(past_gray), cv2.hconcat(future_gray)]),
+          'combined', args.display_all_images)
       past_stats_printer = common.FramePrinter()
       common.print_statistics(past_stats, past_stats_printer)
       common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
 
+
+    # IMPORTANT!!! Subtraction will WRAP with uint8 if it goes negative!
+    def trim_to_uint8(arr): return np.clip(arr, 0, 255).astype(np.uint8)
+    # Subtract out the unchanging background (mean past, mean future) from current frame
+    foreground_mask_past = np.absolute(current_frame_gray.astype(np.int16) - past_stats.mean.astype(np.int16))
+    foreground_mask_future = np.absolute(current_frame_gray.astype(np.int16) - future_stats.mean.astype(np.int16))
+
+    # Threshold the differences and combine them.
+    foreground_mask = np.bitwise_and(foreground_mask_past >= 15, foreground_mask_future >= 15)
+
+    # Mask away the areas we know are changing based on thresholded ptp (ptp past, ptp future).
+    # Take the absolute difference (per pixel) from the mean in each frame.
+    changing_mask_past = np.absolute(past_gray.astype(np.int16) - past_stats.mean.astype(np.int16)) >= 5
+    # Count how many frames were significantly different and threshold.
+    changing_mask_past = np.sum(changing_mask_past, axis=0) >= 3
     
+    # Take the absolute difference (per pixel) from the mean in each frame.
+    changing_mask_future = np.absolute(future_gray.astype(np.int16) - future_stats.mean.astype(np.int16)) >= 5
+    # Count how many frames were significantly different.
+    changing_mask_future = np.sum(changing_mask_future, axis=0) >= 3
+
+    changing_mask = np.bitwise_or(changing_mask_past, changing_mask_future)
+
+    # The final mask is the foreground (keep) minus the changing mask (remove).
+    final_mask = 255 * np.bitwise_and(foreground_mask, np.bitwise_not(changing_mask)).astype(np.uint8)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    # Erode (remove small outlying pixels), then dilate.
+    final_mask_polished = final_mask.copy()
+    final_mask_polished = cv2.erode(final_mask_polished, np.ones((3,3),np.uint8), iterations=1)
+    final_mask_polished = cv2.dilate(final_mask_polished, kernel, iterations=2)
+    #final_mask_polished = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel)
+    
+    common.display_image(np.hstack([
+      255 * foreground_mask.astype(np.uint8),
+      255 * changing_mask.astype(np.uint8),
+      final_mask,
+      final_mask_polished]))
+
+        
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
-    if frame_count >= 500: break
     continue
       
       
