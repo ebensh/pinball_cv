@@ -31,18 +31,21 @@ def display_image(img, title=None, show=True):
 
 
 # This is *INEFFICIENT* and is only intended for quick experimentation.
+# http://blog.hackerearth.com/descriptive-statistics-with-Python-NumPy
 # TODO(ebensh): Add a wrapper class around the named tuple.
-NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'delta', 'median', 'mean', 'variance'])
+NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'ptp', 'mean'])
 def get_named_statistics(frames):
-  minimum = np.minimum.accumulate(frames)
-  maximum = np.maximum.accumulate(frames)
+  minimum = np.amin(frames, axis=0)
+  maximum = np.amax(frames, axis=0)
+  print frames.shape, minimum.shape, maximum.shape
   return NamedStatistics(
     minimum=minimum,
     maximum=maximum,
-    delta=maximum - minimum,
-    median=cv2.convertScaleAbs(np.median(frames, axis=0)),
-    mean=cv2.convertScaleAbs(np.mean(frames, axis=0, dtype=np.float64)),
-    variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
+    ptp=maximum - minimum,
+    mean=cv2.convertScaleAbs(np.mean(frames, axis=0, dtype=np.float64)))
+    #median=cv2.convertScaleAbs(np.median(frames, axis=0)),
+    #
+    #variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
 
 def print_statistics(statistics, printer):
   for field in statistics._fields:
@@ -54,7 +57,7 @@ class FrameBuffer(object):
     # Create our frame buffers. We don't store them together because while it
     # would make the rolling easier it would also require the gray version to
     # be stored with three channels.
-    self._BUFFER_LENGTH = 2 * num_frames
+    self._BUFFER_LENGTH = 2 * num_frames  # Left here in case we want to increase.
     self._num_frames = num_frames
     self._idx = 0
     self._shape = shape
@@ -62,10 +65,10 @@ class FrameBuffer(object):
     self._frames_gray = np.zeros((self._BUFFER_LENGTH,) + shape[0:2], dtype=dtype)
 
   def append(self, frame):
-    self._idx = (self._idx + 1) % self._BUFFER_LENGTH
     idx_to_insert = (self._idx + self._num_frames) % self._BUFFER_LENGTH
     self._frames[idx_to_insert] = frame
     self._frames_gray[idx_to_insert] = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    self._idx = (self._idx + 1) % self._BUFFER_LENGTH
 
   def get_view(self, start, stop, color=True):
     view = None

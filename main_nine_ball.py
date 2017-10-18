@@ -53,8 +53,8 @@ def main():
     if not grabbed: break
     frame_buffer.append(raw_frame)
 
-  #cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
-  #cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
+  cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
+  cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
   frame_count = 0
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
@@ -64,18 +64,20 @@ def main():
     frame_buffer.append(raw_frame)
     frame_printer = common.FramePrinter()
 
-    #past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
-    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)
-    common.display_image(cv2.hconcat(past_gray), 'combined', args.display_all_images)
+    past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
+    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)    
     #current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
     #future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
 
-    #past_stats = common.get_named_statistics(past_gray)
+    past_stats = common.get_named_statistics(past_gray)
     #future_stats = common.NamedStatistics(future_gray)
 
-    #past_stats_printer = common.FramePrinter()
-    #common.print_statistics(past_stats, past_stats_printer)
-    #common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
+    if frame_count % 30 == 0:
+      common.display_image(cv2.hconcat(past_gray), 'combined', args.display_all_images)
+      past_stats_printer = common.FramePrinter()
+      common.print_statistics(past_stats, past_stats_printer)
+      common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
+
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
@@ -150,6 +152,7 @@ def main():
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
+  print frame_count
 
   cap.release()
   cv2.destroyAllWindows()
