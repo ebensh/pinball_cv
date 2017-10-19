@@ -18,19 +18,19 @@ def get_blob_detector():
      
   # Filter by Area.
   params.filterByArea = True
-  params.minArea = 30
-  params.maxArea = 500
+  params.minArea = 50  # The pinball is ~17 pixels across, or 201 area.
+  params.maxArea = 600
     
   # Filter by Circularity
   params.filterByCircularity = True
-  params.minCircularity = 0.8
+  params.minCircularity = 0.6
     
   # Filter by Convexity
   params.filterByConvexity = False
   #params.minConvexity = 0.5
     
   # Filter by Inertia
-  params.filterByInertia = False
+  #params.filterByInertia = True
   #params.minInertiaRatio = 0.5
   return cv2.SimpleBlobDetector_create(params)
 
@@ -60,10 +60,12 @@ def get_perspective_transform(frame, pinball_field_poly):
     (0, rows-1)], dtype=np.float32)      # bottom left
   return cv2.getPerspectiveTransform(pinball_field_poly[:-1].astype(np.float32), corners_of_frame)
 
+# IMPORTANT!!! Subtraction will WRAP with uint8 if it goes negative!
+def trim_to_uint8(arr): return np.clip(arr, 0, 255).astype(np.uint8)
+
 
 def main():
-  BLEND_ALPHA = 0.33
-  FRAME_BUFFER_SIZE = 21
+  FRAME_BUFFER_SIZE = 9
   CURRENT_FRAME_INDEX = FRAME_BUFFER_SIZE/2
 
   cap = cv2.VideoCapture(args.infile)
@@ -90,7 +92,7 @@ def main():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
     frame_count += 1
-    if frame_count % 2 != 0: continue  # Only process every 3rd frame.
+    #if frame_count % 2 != 0: continue
 
     frame_printer = common.FramePrinter()
     
@@ -100,12 +102,12 @@ def main():
     common.display_image(pinball_area, 'pinball_area', args.display_all_images)
     frame_buffer.append(pinball_area)
 
-    past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX)
-    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX, color=False)
+    past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2)
+    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2, color=False)
     current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
     current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
-    future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None)
-    future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1, None, color=False)
+    future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None)
+    future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None, color=False)
 
     past_stats = common.get_named_statistics(past_gray)
     future_stats = common.get_named_statistics(future_gray)
@@ -119,14 +121,31 @@ def main():
       common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
 
 
-    # IMPORTANT!!! Subtraction will WRAP with uint8 if it goes negative!
-    def trim_to_uint8(arr): return np.clip(arr, 0, 255).astype(np.uint8)
+    # current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
+    # current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
+    # window = frame_buffer.get_view(CURRENT_FRAME_INDEX - 2, CURRENT_FRAME_INDEX + 3)  # -2 to +2
+    # window_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX - 2, CURRENT_FRAME_INDEX + 3, color=False)  # -2 to +2
+    # window_stats = common.get_named_statistics(window_gray)
+    # common.display_image(cv2.hconcat(window_gray), 'window_gray', args.display_all_images)
+    # window_stats_printer = common.FramePrinter()
+    # common.print_statistics(window_stats, window_stats_printer)
+    # common.display_image(window_stats_printer.get_combined_image(), 'window_stats', args.display_all_images)
+
+    # foreground_mask = trim_to_uint8(current_frame_gray.astype(np.int16) - window_stats.mean.astype(np.int16))
+    # common.display_image(foreground_mask, 'foreground_mask')
+    # _, foreground_mask = cv2.threshold(foreground_mask, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # common.display_image(foreground_mask, 'foreground_mask_thresholded')
+    # common.display_image(cv2.bitwise_and(current_frame, current_frame, mask=foreground_mask))
+    # if cv2.waitKey(1) & 0xFF == ord('q'):
+    #   break
+    # continue
+    
     # Subtract out the unchanging background (mean past, mean future) from current frame
     foreground_mask_past = np.absolute(current_frame_gray.astype(np.int16) - past_stats.mean.astype(np.int16))
     foreground_mask_future = np.absolute(current_frame_gray.astype(np.int16) - future_stats.mean.astype(np.int16))
 
     # Threshold the differences and combine them.
-    foreground_mask = np.bitwise_and(foreground_mask_past >= 15, foreground_mask_future >= 15)
+    foreground_mask = np.bitwise_and(foreground_mask_past >= 25, foreground_mask_future >= 25)
 
     # Mask away the areas we know are changing based on thresholded ptp (ptp past, ptp future).
     # Take the absolute difference (per pixel) from the mean in each frame.
@@ -158,7 +177,7 @@ def main():
       final_mask_polished]), 'masks', args.display_all_images)
 
     keypoints = detector.detect(cv2.bitwise_not(final_mask_polished))
-    print "Keypoints:", keypoints
+    print "Frame {}: {}".format(frame_count, ','.join(str((kp.pt, kp.size)) for kp in keypoints))
     # Fade away old points.
     pinball_points = trim_to_uint8(pinball_points.astype(np.int16) - 1)
     # Then draw new points.
@@ -169,10 +188,6 @@ def main():
     common.display_image(pinball_points_display, 'pinball_points')
     if video:
       video.write(pinball_points_display)
-        
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-      break
-    continue
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break

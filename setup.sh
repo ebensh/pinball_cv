@@ -6,6 +6,7 @@
 
 #avconv -ss 00:00:10 -i atlantis_tutorial_video.mp4 -t 00:00:10 -codec copy short_clip.mp4
 #avconv -ss 00:00:10 -i atlantis_tutorial_video.mp4 -t 00:05:00 -codec copy intro_removed.mp4
+ffmpeg -i input_videos/atlantis_tutorial_video.mp4 -ss 00:00:10 -vf scale="iw*.5:ih*.5" -t 00:01:00 input_videos/atlantis_intro_removed.mp4
 
 #avconv -ss 00:01:05 -i input_videos/nine_ball_original.mp4 scale="trunc(oh*a*2)/2:480" -t 00:00:58 -codec copy input_videos/nine_ball.mp4
 #avconv -i input_videos/nine_ball_original.mp4 scale="1080x608" -codec copy input_videos/nine_ball.mp4
