@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import argparse
-from collections import deque
 import cv2
 import itertools
 import numpy as np
@@ -17,7 +16,6 @@ def main():
   #print "Mask: {0}, {1}".format(mask.shape, mask.dtype)
   
   FRAME_BUFFER_SIZE = 10
-  frame_buffer = deque([], maxlen=FRAME_BUFFER_SIZE)
   
   # Loop until the frame buffer is full at the start.
   while cap.isOpened() and len(frame_buffer) < FRAME_BUFFER_SIZE:

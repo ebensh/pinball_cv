@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
 import argparse
-from collections import deque
 import cv2
 import itertools
 import numpy as np
+import pickle
 
 import common
 
@@ -18,7 +18,7 @@ def get_blob_detector():
      
   # Filter by Area.
   params.filterByArea = True
-  params.minArea = 50  # The pinball is ~17 pixels across, or 201 area.
+  params.minArea = 75  # The pinball is ~17 pixels across, or 201 area.
   params.maxArea = 600
     
   # Filter by Circularity
@@ -71,6 +71,7 @@ def main():
   cap = cv2.VideoCapture(args.infile)
 
   detector = get_blob_detector()  # REMEMBER: DETECTS BLACK OBJECTS, WHITE BG.
+  frame_to_keypoints = {}
 
   _, raw_frame = cap.read()
   frame_buffer = common.FrameBuffer(FRAME_BUFFER_SIZE, raw_frame.shape)
@@ -91,14 +92,13 @@ def main():
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
-    frame_count += 1
     #if frame_count % 2 != 0: continue
 
     frame_printer = common.FramePrinter()
     
     pinball_area = cv2.bitwise_and(raw_frame, raw_frame, mask=pinball_field_mask)
-    pinball_area = cv2.warpPerspective(pinball_area, pinball_perspective_transform,
-                                       dsize=raw_frame.shape[1::-1])
+    #pinball_area = cv2.warpPerspective(pinball_area, pinball_perspective_transform,
+    #                                   dsize=raw_frame.shape[1::-1])
     common.display_image(pinball_area, 'pinball_area', args.display_all_images)
     frame_buffer.append(pinball_area)
 
@@ -166,7 +166,7 @@ def main():
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     # Erode (remove small outlying pixels), then dilate.
     final_mask_polished = final_mask.copy()
-    final_mask_polished = cv2.erode(final_mask_polished, np.ones((3,3),np.uint8), iterations=1)
+    final_mask_polished = cv2.erode(final_mask_polished, np.ones((3, 3),np.uint8), iterations=1)
     final_mask_polished = cv2.dilate(final_mask_polished, kernel, iterations=2)
     #final_mask_polished = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel)
     
@@ -177,7 +177,7 @@ def main():
       final_mask_polished]), 'masks', args.display_all_images)
 
     keypoints = detector.detect(cv2.bitwise_not(final_mask_polished))
-    print "Frame {}: {}".format(frame_count, ','.join(str((kp.pt, kp.size)) for kp in keypoints))
+    frame_to_keypoints[frame_count] = [(kp.pt[0], kp.pt[1], kp.size) for kp in keypoints]
     # Fade away old points.
     pinball_points = trim_to_uint8(pinball_points.astype(np.int16) - 1)
     # Then draw new points.
@@ -188,10 +188,15 @@ def main():
     common.display_image(pinball_points_display, 'pinball_points')
     if video:
       video.write(pinball_points_display)
-    
+
+    frame_count += 1
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
   print 'Frames processed: %d' % frame_count
+
+  # Write the pickled keypoints.
+  with open(args.keypoints, 'wb') as keypoints_file:
+    pickle.dump(frame_to_keypoints, keypoints_file)
 
   cap.release()
   video.release()
@@ -202,6 +207,7 @@ if __name__ == '__main__':
   parser.add_argument('--infile', required=True, type=str, help='Input video file path.')
   #parser.add_argument('--background', type=str, help='Path to background to subtract.')
   #parser.add_argument('--mask', type=str, help='Mask to apply to each frame.')
+  parser.add_argument('--keypoints', type=str, help='Path to keypoints file to write.')
   parser.add_argument('--display_all_images', default=False, type=bool,
                       help='Display all (debug) images.')
   args = parser.parse_args()
