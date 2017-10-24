@@ -57,13 +57,14 @@ def main():
 
   output_segments = []
   for video in ["PinballFieldVideo", "ScoreBoardVideo"]:
-    output_segments.append(OutputSegment(
-        path          = game_config.get(video, "path"),
-        region        = np.array(eval(game_config.get(video, "region"))),
-        input_rows    = input_rows,
-        input_cols    = input_cols,
-        output_rows   = game_config.getint(video, "rows"),
-        output_cols   = game_config.getint(video, "cols")))
+    segment = OutputSegment(
+        path        = game_config.get(video, "path"),
+        region      = np.array(eval(game_config.get(video, "region"))),
+        input_rows  = input_rows,
+        input_cols  = input_cols,
+        output_rows = game_config.getint(video, "rows"),
+        output_cols = game_config.getint(video, "cols"))
+    output_segments.append(segment)
 
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
