@@ -10,16 +10,16 @@ import numpy as np
 
 
 class OutputSegment(object):
-  def __init__(self, path, region, rows, cols):
+  def __init__(self, path, region, input_rows, input_cols, output_rows, output_cols):
     self._path = path
     self._region = region
-    self._rows = rows
-    self._cols = cols
-    self._mask = OutputSegment._get_region_as_mask(rows, cols, region)
-    self._perspective_transform = OutputSegment._get_perspective_transform(rows, cols, region)
+    self._rows = output_rows
+    self._cols = output_cols
+    self._mask = OutputSegment._get_region_as_mask(input_rows, input_cols, region)
+    self._perspective_transform = OutputSegment._get_perspective_transform(output_rows, output_cols, region)
     # Note the swap of rows and cols here, as VideoWriter takes (width, height).
     self._video = cv2.VideoWriter(self._path, cv2.VideoWriter_fourcc(*'XVID'),
-                                  30.0, (cols, rows))
+                                  30.0, (output_cols, output_rows))
 
   def process_frame(self, frame):
     area_of_interest = cv2.bitwise_and(frame, frame, mask=self._mask)
@@ -58,10 +58,12 @@ def main():
   output_segments = []
   for video in ["PinballFieldVideo", "ScoreBoardVideo"]:
     output_segments.append(OutputSegment(
-        path   = game_config.get(video, "path"),
-        region = np.array(eval(game_config.get(video, "region"))),
-        rows   = game_config.getint(video, "rows"),
-        cols   = game_config.getint(video, "cols")))
+        path          = game_config.get(video, "path"),
+        region        = np.array(eval(game_config.get(video, "region"))),
+        input_rows    = input_rows,
+        input_cols    = input_cols,
+        output_rows   = game_config.getint(video, "rows"),
+        output_cols   = game_config.getint(video, "cols")))
 
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
