@@ -4,6 +4,7 @@
 # playfield and score regions.
 
 import argparse
+import common
 import ConfigParser
 import cv2
 import numpy as np
@@ -15,8 +16,8 @@ class OutputSegment(object):
     self._region = region
     self._rows = output_rows
     self._cols = output_cols
-    self._mask = OutputSegment._get_region_as_mask(input_rows, input_cols, region)
-    self._perspective_transform = OutputSegment._get_perspective_transform(output_rows, output_cols, region)
+    self._mask = common.get_region_as_mask(input_rows, input_cols, region)
+    self._perspective_transform = common.get_perspective_transform(output_rows, output_cols, region)
     # Note the swap of rows and cols here, as VideoWriter takes (width, height).
     self._video = cv2.VideoWriter(self._path, cv2.VideoWriter_fourcc(*'XVID'),
                                   30.0, (output_cols, output_rows))
@@ -31,21 +32,6 @@ class OutputSegment(object):
 
   def release(self):
     self._video.release()
-
-  @staticmethod
-  def _get_region_as_mask(rows, cols, region):
-    mask = np.zeros((rows, cols), dtype=np.uint8)
-    cv2.fillConvexPoly(mask, region, 255)
-    return mask
-
-  @staticmethod
-  def _get_perspective_transform(rows, cols, region):
-    corners = np.array([
-        (0, 0),            # top left
-        (cols-1, 0),       # top right
-        (cols-1, rows-1),  # bottom right
-        (0, rows-1)], dtype=np.float32)  # bottom left
-    return cv2.getPerspectiveTransform(region[:-1].astype(np.float32), corners)
 
 
 def main():

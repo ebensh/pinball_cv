@@ -126,3 +126,15 @@ class FramePrinter(object):
       
     
 
+def get_region_as_mask(rows, cols, region):
+  mask = np.zeros((rows, cols), dtype=np.uint8)
+  cv2.fillConvexPoly(mask, region, 255)
+  return mask
+
+def get_perspective_transform(rows, cols, region):
+  corners = np.array([
+    (0, 0),            # top left
+    (cols-1, 0),       # top right
+    (cols-1, rows-1),  # bottom right
+    (0, rows-1)], dtype=np.float32)  # bottom left
+  return cv2.getPerspectiveTransform(region[:-1].astype(np.float32), corners)
