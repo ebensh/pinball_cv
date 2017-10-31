@@ -29,18 +29,18 @@ def display_image(img, title=None, show=True):
       title = "{0}:{1}".format(filename, line_num)
     cv2.imshow(title, img)
 
-
 # This is *INEFFICIENT* and is only intended for quick experimentation.
 # http://blog.hackerearth.com/descriptive-statistics-with-Python-NumPy
 # TODO(ebensh): Add a wrapper class around the named tuple.
-NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'ptp', 'mean'])
+#NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'ptp', 'mean'])
+NamedStatistics = namedtuple('NamedStatistics', ['mean'])
 def get_named_statistics(frames):
-  minimum = np.amin(frames, axis=0)
-  maximum = np.amax(frames, axis=0)
+  #minimum = np.amin(frames, axis=0)
+  #maximum = np.amax(frames, axis=0)
   return NamedStatistics(
-    minimum=minimum,
-    maximum=maximum,
-    ptp=maximum - minimum,
+    #minimum=minimum,
+    #maximum=maximum,
+    #ptp=maximum - minimum,
     mean=np.mean(frames, axis=0, dtype=np.float64).astype(np.uint8))
     #median=cv2.convertScaleAbs(np.median(frames, axis=0)),
     #variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
@@ -138,3 +138,6 @@ def get_perspective_transform(rows, cols, region):
     (cols-1, rows-1),  # bottom right
     (0, rows-1)], dtype=np.float32)  # bottom left
   return cv2.getPerspectiveTransform(region[:-1].astype(np.float32), corners)
+
+# IMPORTANT!!! Subtraction will WRAP with uint8 if it goes negative!
+def trim_to_uint8(arr): return np.clip(arr, 0, 255).astype(np.uint8)
