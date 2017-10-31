@@ -64,11 +64,11 @@ def main():
   CURRENT_FRAME_INDEX = FRAME_BUFFER_SIZE/2
   game_config = ConfigParser.ConfigParser()
   game_config.read(args.game_config)
-  input_rows = game_config.getint("PinballFieldVideo", "rows")
-  input_cols = game_config.getint("PinballFieldVideo", "cols")
-  cap = cv2.VideoCapture(game_config.get("PinballFieldVideo", "path"))
+  input_rows = game_config.getint('PinballFieldVideo', 'rows')
+  input_cols = game_config.getint('PinballFieldVideo', 'cols')
+  cap = cv2.VideoCapture(game_config.get('PinballFieldVideo', 'path'))
   
-  keypoints_path = game_config.get("PinballFieldVideo", "keypoints_path")
+  keypoints_path = game_config.get('PinballFieldVideo', 'keypoints_path')
   keypoint_detector = OutputSegment(keypoints_path)
 
   frame_buffer = common.FrameBuffer(FRAME_BUFFER_SIZE, (input_rows, input_cols, 3))
@@ -107,7 +107,7 @@ def main():
     foreground_mask_future = np.absolute(current_frame_gray.astype(np.int16) - future_stats.mean.astype(np.int16))
 
     # Threshold the differences and combine them.
-    foreground_mask = np.bitwise_and(foreground_mask_past >= 25, foreground_mask_future >= 25)
+    foreground_mask = np.logical_and(foreground_mask_past >= 25, foreground_mask_future >= 25)
 
     # Mask away the areas we know are changing based on thresholded ptp (ptp past, ptp future).
     # Take the absolute difference (per pixel) from the mean in each frame.
@@ -120,10 +120,10 @@ def main():
     # Count how many frames were significantly different.
     changing_mask_future = np.sum(changing_mask_future, axis=0) >= 3
 
-    changing_mask = np.bitwise_or(changing_mask_past, changing_mask_future)
+    changing_mask = np.logical_or(changing_mask_past, changing_mask_future)
 
     # The final mask is the foreground (keep) minus the changing mask (remove).
-    final_mask = 255 * np.bitwise_and(foreground_mask, np.bitwise_not(changing_mask)).astype(np.uint8)
+    final_mask = 255 * np.logical_and(foreground_mask, np.logical_not(changing_mask)).astype(np.uint8)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     # Erode (remove small outlying pixels), then dilate.
