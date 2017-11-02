@@ -10,6 +10,7 @@ import pickle
 import sys
 
 import common
+from common import eprint
 
 COLOR_NEGATIVE     = (0, 0, 255)    # Red
 COLOR_UNKNOWN      = (255, 0, 255)  # Purple
@@ -102,6 +103,7 @@ def main():
     grabbed, raw_frame = cap.read()
     if not grabbed: break
     frame = raw_frame.copy()  # Unnecessary copy to preserve original. Remove?
+    
 
     labeled_frame = labeled_frames[frame_index]
     labeled_points = labeled_frame.labeled_points
@@ -139,6 +141,8 @@ def main():
               (y1 + y2) / 2)
     def dist((x1, y1), (x2, y2)):
       return (x2 - x1)**2 + (y2 - y1)**2
+    def in_bounds(input_cols, input_rows, (x, y)):
+      return (x >= 0 and x < input_cols and y >= 0 and y < input_rows)
     
     # Extrapolate from the n-2 and n-1 frame to get a past prediction of current
     # location as a vector of the same magnitude and direction (best guess).
@@ -147,23 +151,48 @@ def main():
     past_extrapolation = None
     if two_before and one_before:
       past_extrapolation = extrapolate(two_before, one_before)
-      cv2.arrowedLine(frame, two_before.xy(), past_extrapolation[:2],
-                      COLOR_EXTRAPOLATED)
+      if not in_bounds(input_cols, input_rows, past_extrapolation[:2]):
+        past_extrapolation = None
+      else:
+        cv2.arrowedLine(frame, two_before.xy(), past_extrapolation[:2],
+                        COLOR_EXTRAPOLATED)
 
     one_after = next_frame(1).positive_point()
     two_after = next_frame(2).positive_point()
     future_extrapolation = None
     if two_after and one_after:
       future_extrapolation = extrapolate(two_after, one_after)
-      cv2.arrowedLine(frame, two_after.xy(), future_extrapolation[:2],
-                      COLOR_EXTRAPOLATED)
+      if not in_bounds(input_cols, input_rows, future_extrapolation[:2]):
+        future_extrapolation = None
+      else:
+        cv2.arrowedLine(frame, two_after.xy(), future_extrapolation[:2],
+                        COLOR_EXTRAPOLATED)
 
+    before_and_after_lerp = None
     if one_before and one_after:
       before_and_after_lerp = lerp(one_before.xy(), one_after.xy())
-      cv2.arrowedLine(frame, one_before.xy(), before_and_after_lerp,
-                      COLOR_EXTRAPOLATED)
-      cv2.arrowedLine(frame, one_after.xy(), before_and_after_lerp,
-                      COLOR_EXTRAPOLATED)
+      if not in_bounds(input_cols, input_rows, before_and_after_lerp):
+        before_and_after_lerp = None
+      else:
+        cv2.arrowedLine(frame, one_before.xy(), before_and_after_lerp,
+                        COLOR_EXTRAPOLATED)
+        cv2.arrowedLine(frame, one_after.xy(), before_and_after_lerp,
+                        COLOR_EXTRAPOLATED)
+
+    # If we have no keypoints in the current frame, try adding the
+    # past_extrapolation, future_extrapolation, and past_and_future_lerp as unknown
+    # keypoints for next pass.
+    if not labeled_points or labeled_frame.num_points() == labeled_frame.num_points(LABEL_NEGATIVE):
+      print "Adding points to frame:", frame_index
+      if past_extrapolation:
+        labeled_points.append(LabeledPoint(
+          past_extrapolation[0], past_extrapolation[1], one_before.size))
+      if future_extrapolation:
+        labeled_points.append(LabeledPoint(
+          future_extrapolation[0], future_extrapolation[1], one_after.size))
+      if before_and_after_lerp:
+        labeled_points.append(LabeledPoint(
+          before_and_after_lerp[0], before_and_after_lerp[1], one_before.size))
 
     if past_extrapolation and future_extrapolation:
       # This is where we expect the ball to be, based on past and future
@@ -175,21 +204,25 @@ def main():
         if distance < least_distance:
           least_distance = distance
           closest_point = lp
-      if closest_point and least_distance < 100:
+      if closest_point and closest_point.label == LABEL_POSITIVE and least_distance > 30:
+        closest_point.label = LABEL_UNKNOWN
+      if closest_point and least_distance < 30:
         closest_point.label = LABEL_POSITIVE
-      for lp in labeled_points:
-        if lp.label != LABEL_POSITIVE:
-          lp.label = LABEL_NEGATIVE
+        for lp in labeled_points:
+          if lp.label != LABEL_POSITIVE:
+            lp.label = LABEL_NEGATIVE
             
     for lp in labeled_points:
       point_label_counts[pass_iteration][lp.label] += 1
 
-    common.display_image(raw_frame, show=True)
-    for lf in labeled_frames[frame_index-10:frame_index+1]:
+    #common.display_image(raw_frame, show=True)
+    for lf in labeled_frames[frame_index-3:frame_index+4]:
       lf.draw_on_frame(frame)
     for iteration, label_counts in point_label_counts.iteritems():
       cv2.putText(frame, str(label_counts), (0, 12 * (iteration + 1)),
                   cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 2)
+    cv2.putText(frame, ':'.join([str(pass_iteration), str(frame_index)]),
+                (0, input_rows - 12), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 2)
     common.display_image(frame, show=True)
     video.write(frame)
     

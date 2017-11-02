@@ -1,7 +1,11 @@
+from __future__ import print_function
 from collections import namedtuple
 import cv2
 import inspect
 import numpy as np
+
+def eprint(*args, **kwargs):
+  print(*args, file=sys.stderr, **kwargs)
 
 # http://ipython-books.github.io/featured-01/
 def get_data_base(arr):
@@ -14,11 +18,10 @@ def get_data_base(arr):
 
 def arrays_share_data(x, y): return get_data_base(x) is get_data_base(y)
 
-
 def print_by_channel(img):
   rows, cols, channels = img.shape
   for channel in xrange(channels):
-    print img[:,:,channel]
+    print(img[:,:,channel])
 
 def display_image(img, title=None, show=True):
   if show:
