@@ -15,7 +15,10 @@
 #ffmpeg -i input_videos/nine_ball_original.mp4 -ss 00:01:01 -vf scale="iw*.5:ih*.5" -t 00:01:02 input_videos/nine_ball.mp4
 #ffmpeg -i input_videos/nine_ball_original.mp4 -ss 00:01:01 -t 00:01:02 input_videos/nine_ball.mp4
 
-ffmpeg -i input_videos/rollergames_original.mp4 -ss 00:02:16 -t 00:00:29 input_videos/rollergames.mp4
+#ffmpeg -i input_videos/rollergames_original.mp4 -ss 00:02:16 -t 00:00:29 input_videos/rollergames.mp4
+
+# https://stackoverflow.com/questions/11004137/re-sampling-h264-video-to-reduce-frame-rate-while-maintaining-high-image-quality
+ffmpeg -i input_videos/hot_hand_ebensh_2017_11_27_original.mp4 -ss 00:00:03 -t 00:00:27 -r 30 -an -vf "transpose=1,scale=iw*.5:ih*.5" -c:v libx264 -b:v 3M -movflags faststart input_videos/hot_hand_ebensh_2017_11_27.mp4
 
 # ./segmenter.py --game_config=configs/atlantis_full_resolution.cfg
 # ffmpeg -i processed_videos/atlantis_score_board.avi -filter:v "crop=132:20:0:0" processed_videos/atlantis_score_board_player1.avi
@@ -25,4 +28,5 @@ ffmpeg -i input_videos/rollergames_original.mp4 -ss 00:02:16 -t 00:00:29 input_v
 #ffmpeg -i processed_videos/nine_ball_score_board.avi -filter:v "crop=555:63:30:10" processed_videos/nine_ball_score_board_player1.avi
 # ffmpeg -i processed_videos/nine_ball_score_board_player1.avi "processed_videos/player1_%04d.jpg"
 
-./segmenter.py --game_config=configs/rollergames_full_resolution.cfg
+# ./segmenter.py --game_config=configs/rollergames_full_resolution.cfg
+./segmenter.py --game_config=configs/hot_hand_full_resolution.cfg

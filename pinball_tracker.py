@@ -76,6 +76,7 @@ def main():
   if args.display_all_images:
     cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
     cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
+    cv2.namedWindow('masks', cv2.WINDOW_NORMAL)
   frame_index = 0
   while cap.isOpened():
     grabbed, raw_frame = cap.read()
@@ -88,13 +89,14 @@ def main():
     past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2, color=False)
     current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
     current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
+    current_frame_hsv = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
     future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None)
     future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None, color=False)
 
     past_stats = common.get_named_statistics(past_gray)
     future_stats = common.get_named_statistics(future_gray)
 
-    if True:  # frame_count % 30 == 0:
+    if frame_index % 3 == 0:
       common.display_image(
           cv2.vconcat([cv2.hconcat(past_gray), cv2.hconcat(future_gray)]),
           'combined', args.display_all_images)
@@ -122,8 +124,20 @@ def main():
 
     changing_mask = np.logical_or(changing_mask_past, changing_mask_future)
 
+    # Create a mask from the HSV image to identify bright areas (high value).
+    lights_mask = np.uint8(255) * (current_frame_hsv[:,:,2] > 235)
+    # Erode then dilate.
+    lights_mask = cv2.morphologyEx(lights_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
+
+    # Create a mask from the HSV image to identify saturated areas (non-gray).
+    colorful_mask = np.uint8(255) * (current_frame_hsv[:,:,1] > 20)
+    colorful_mask = cv2.morphologyEx(colorful_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
+
+    changing_mask = np.logical_or(changing_mask, lights_mask)
+    changing_mask = np.logical_or(changing_mask, colorful_mask)
+
     # The final mask is the foreground (keep) minus the changing mask (remove).
-    final_mask = 255 * np.logical_and(foreground_mask, np.logical_not(changing_mask)).astype(np.uint8)
+    final_mask = np.uint8(255) * np.logical_and(foreground_mask, np.logical_not(changing_mask))
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     # Erode (remove small outlying pixels), then dilate.
@@ -133,8 +147,8 @@ def main():
     #final_mask_polished = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel)
     
     common.display_image(np.hstack([
-      255 * foreground_mask.astype(np.uint8),
-      255 * changing_mask.astype(np.uint8),
+      np.uint8(255) * foreground_mask,
+      np.uint8(255) * changing_mask,
       final_mask,
       final_mask_polished]), 'masks', args.display_all_images)
 

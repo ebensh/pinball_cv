@@ -19,7 +19,7 @@ class OutputSegment(object):
     self._mask = common.get_region_as_mask(input_rows, input_cols, region)
     self._perspective_transform = common.get_perspective_transform(output_rows, output_cols, region)
     # Note the swap of rows and cols here, as VideoWriter takes (width, height).
-    self._video = cv2.VideoWriter(self._path, cv2.VideoWriter_fourcc(*'XVID'),
+    self._video = cv2.VideoWriter(self._path, cv2.VideoWriter_fourcc(*'H264'),
                                   30.0, (output_cols, output_rows))
 
   def process_frame(self, frame):
@@ -43,6 +43,7 @@ def main():
 
   output_segments = []
   for video in ["PinballFieldVideo", "ScoreBoardVideo"]:
+    if not game_config.has_section(video): continue
     segment = OutputSegment(
         path        = game_config.get(video, "path"),
         region      = np.array(eval(game_config.get(video, "region"))),
