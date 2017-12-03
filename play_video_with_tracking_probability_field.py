@@ -1,12 +1,9 @@
-#!/usr/bin/python
-
 import argparse
 from collections import deque
-import ConfigParser
+import configparser
 import cv2
-from itertools import islice, izip
+import json
 import numpy as np
-import pickle
 import sys
 
 import common
@@ -21,11 +18,12 @@ LABEL_NEGATIVE = 0
 LABEL_UNKNOWN  = 1
 LABEL_POSITIVE = 2
 class LabeledPoint(object):
-  def __init__(self, x, y, size, label=LABEL_UNKNOWN):
+  def __init__(self, x, y, size, label=LABEL_UNKNOWN, attributes=[]): 
     self.x = x
     self.y = y
     self.size = size
     self.label = label
+    self.attributes = attributes
   def color(self):
     if self.label == LABEL_NEGATIVE: return COLOR_NEGATIVE
     elif self.label == LABEL_UNKNOWN: return COLOR_UNKNOWN
@@ -33,43 +31,9 @@ class LabeledPoint(object):
   def xy(self):
     return (self.x, self.y)
 
-
-class LabeledFrame(object):
-  def __init__(self, frame_index, labeled_points):
-    self.frame_index = frame_index
-    self.labeled_points = labeled_points
-
-  def add_point(self, point):
-    self.labeled_points.append(point)
-
-  def num_points(self, label=None):
-    if label is None:
-      return len(self.labeled_points)
-    return sum(map(lambda lp: lp.label == label, self.labeled_points))
-
-  def positive_point(self):
-    for point in self.labeled_points:
-      if point.label == LABEL_POSITIVE:
-        return point
-    return None
-
-  def draw_on_mask(self, mask):
-    for lp in self.labeled_points:
-      # Filled circle in the mask - use a small size to avoid masking out the ball.
-      cv2.circle(mask, (lp.x, lp.y), 4, 255, -1)
-    return mask
-
-  def draw_on_frame(self, frame):
-    # TODO: Handle more than one pinball :)
-    for lp in self.labeled_points:
-      cv2.circle(frame, (lp.x, lp.y), 4, lp.color(), -1)
-      cv2.putText(frame, str(self.frame_index), (lp.x, max(lp.y-10, 0)),
-                  cv2.FONT_HERSHEY_PLAIN, 1, lp.color(), 2)
-    return frame
-
+  
 def main():
-  FADE_STEP_COUNT = 60  # ~2 seconds
-  game_config = ConfigParser.ConfigParser()
+  game_config = configparser.ConfigParser()
   game_config.read(args.game_config)
   input_rows = game_config.getint('PinballFieldVideo', 'rows')
   input_cols = game_config.getint('PinballFieldVideo', 'cols')
@@ -77,24 +41,26 @@ def main():
   video = cv2.VideoWriter('video.avi', cv2.VideoWriter_fourcc(*'XVID'),
                           30.0, (input_cols, input_rows))
 
-  frame_to_keypoints = None
-  with open(game_config.get('PinballFieldVideo', 'keypoints_path'), 'rb') as keypoints_file:
-    frame_to_keypoints = pickle.load(keypoints_file)
-  num_frames = len(frame_to_keypoints)
-  assert num_frames == max(frame_to_keypoints.keys()) + 1
+  print("HERE :D")
+  
+  frame_to_keypoints_str = None
+  with open(game_config.get('PinballFieldVideo', 'keypoints_path'), 'r') as keypoints_file:
+    frame_to_keypoints_str = json.load(keypoints_file)
+  num_frames = len(frame_to_keypoints_str)
+  assert num_frames == max(map(int, frame_to_keypoints_str.keys())) + 1
 
-  labeled_frames = [None] * num_frames
-  for index in xrange(num_frames):
-    keypoints = [LabeledPoint(int(round(x)), int(round(y)), int(round(size)))
-                 for x, y, size in frame_to_keypoints[index]]
-    labeled_frames[index] = LabeledFrame(index, keypoints)
+  frame_to_keypoints = {}
+  for frame_index_str, keypoints_str in frame_to_keypoints_str.iteritems():
+    frame_to_keypoints[int(frame_index_str)] = [
+      [int(round(x)), int(round(y)), int(round(size))] for x, y, size in keypoints_str]
+  frame_to_keypoints_str = None
+  print(frame_to_keypoints)
+  return
 
-  background = cv2.imread(args.background, cv2.IMREAD_COLOR)
-  # We use point_history as a mask that fades over time. Each time we see a
-  # point (circle) we set it in the mask to 255. We create a new mask of the
-  # current frame's points - the background mask, keeping only the remaining
-  # points.
-  keypoints_mask_history = np.zeros(background.shape[:2], np.uint8)
+  # We use a prior that starts at some initial value (0.001). As we see the ball
+  # pass through areas we update the prior.
+  keypoints_mask_history = np.zeros([input_rows, input_cols], np.uint8)
+  
 
   frame_index = 0
   pass_iteration = 0
@@ -135,12 +101,20 @@ def main():
       vx = lp2.x - lp1.x
       vy = lp2.y - lp1.y
       return (lp2.x + vx, lp2.y + vy, int((lp1.size + lp2.size) / 2))
-    def lerp((x1, y1), (x2, y2)):
+    
+    def lerp(xy1, xy2):
+      x1, y1 = xy1
+      x2, y2 = xy2
       return ((x1 + x2) / 2,
               (y1 + y2) / 2)
-    def dist((x1, y1), (x2, y2)):
+    
+    def dist(xy1, xy2):
+      x1, y1 = xy1
+      x2, y2 = xy2
       return (x2 - x1)**2 + (y2 - y1)**2
-    def in_bounds(input_cols, input_rows, (x, y)):
+    
+    def in_bounds(input_cols, input_rows, xy):
+      x, y = xy
       return (x >= 0 and x < input_cols and y >= 0 and y < input_rows)
     
     # Extrapolate from the n-2 and n-1 frame to get a past prediction of current
@@ -182,7 +156,7 @@ def main():
     # past_extrapolation, future_extrapolation, and past_and_future_lerp as unknown
     # keypoints for next pass.
     if not labeled_points or labeled_frame.num_points() == labeled_frame.num_points(LABEL_NEGATIVE):
-      print "Adding points to frame:", frame_index
+      print("Adding points to frame:", frame_index)
       if past_extrapolation:
         labeled_points.append(LabeledPoint(
           past_extrapolation[0], past_extrapolation[1], one_before.size))
@@ -244,6 +218,5 @@ if __name__ == '__main__':
   parser.add_argument('--game_config', required=True, type=str, help='Game configuration file.')
   parser.add_argument('--display_all_images', default=False, type=bool,
                       help='Display all (debug) images.')
-  parser.add_argument('--background', required=True, type=str, help='Background to help visualize.')
   args = parser.parse_args()
   main()

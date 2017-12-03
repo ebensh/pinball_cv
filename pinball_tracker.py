@@ -1,15 +1,15 @@
 #!/usr/bin/python
 
 # Tracks all pinball-ish blobs across a pinball playfield video, outputting a
-# pickled dictionary of frame number -> keypoint triples (x, y, size).
+# json dictionary of frame number -> keypoint triples (x, y, size).
 
 import argparse
 import common
 import ConfigParser
 import cv2
 import itertools
+import json
 import numpy as np
-import pickle
 
 
 class OutputSegment(object):
@@ -24,8 +24,8 @@ class OutputSegment(object):
     
     # Filter by Area.
     params.filterByArea = True
-    params.minArea = 50*4
-    params.maxArea = 600*4
+    params.minArea = 50
+    params.maxArea = 600
     
     # Filter by Circularity
     params.filterByCircularity = True
@@ -54,9 +54,9 @@ class OutputSegment(object):
       (kp.pt[0], kp.pt[1], kp.size) for kp in keypoints]
 
   def release(self):
-    # Write the pickled keypoints.
+    # Write the json keypoints.
     with open(self._path, 'wb') as keypoints_file:
-      pickle.dump(self._frame_to_keypoints, keypoints_file)
+      json.dump(self._frame_to_keypoints, keypoints_file)
 
 
 def main():
@@ -89,7 +89,7 @@ def main():
     past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2, color=False)
     current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
     current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
-    current_frame_hsv = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
+    #current_frame_hsv = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
     future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None)
     future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None, color=False)
 
@@ -125,16 +125,16 @@ def main():
     changing_mask = np.logical_or(changing_mask_past, changing_mask_future)
 
     # Create a mask from the HSV image to identify bright areas (high value).
-    lights_mask = np.uint8(255) * (current_frame_hsv[:,:,2] > 235)
+    #lights_mask = np.uint8(255) * (current_frame_hsv[:,:,2] > 235)
     # Erode then dilate.
-    lights_mask = cv2.morphologyEx(lights_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
+    #lights_mask = cv2.morphologyEx(lights_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
 
     # Create a mask from the HSV image to identify saturated areas (non-gray).
-    colorful_mask = np.uint8(255) * (current_frame_hsv[:,:,1] > 20)
-    colorful_mask = cv2.morphologyEx(colorful_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
+    #colorful_mask = np.uint8(255) * (current_frame_hsv[:,:,1] > 20)
+    #colorful_mask = cv2.morphologyEx(colorful_mask, cv2.MORPH_OPEN, np.ones((5,5),np.uint8))
 
-    changing_mask = np.logical_or(changing_mask, lights_mask)
-    changing_mask = np.logical_or(changing_mask, colorful_mask)
+    #changing_mask = np.logical_or(changing_mask, lights_mask)
+    #changing_mask = np.logical_or(changing_mask, colorful_mask)
 
     # The final mask is the foreground (keep) minus the changing mask (remove).
     final_mask = np.uint8(255) * np.logical_and(foreground_mask, np.logical_not(changing_mask))
