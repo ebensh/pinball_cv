@@ -1,11 +1,16 @@
-from __future__ import print_function
+#!/usr/bin/env python3
+
 from collections import namedtuple
 import cv2
 import inspect
+import json
+import matplotlib.pyplot as plt
 import numpy as np
 
 def eprint(*args, **kwargs):
   print(*args, file=sys.stderr, **kwargs)
+def numpy_print_cols(cols=160):
+  np.core.arrayprint._line_width = cols
 
 # http://ipython-books.github.io/featured-01/
 def get_data_base(arr):
@@ -51,8 +56,8 @@ def get_named_statistics(frames):
 def print_statistics(statistics, printer):
   for field in statistics._fields:
     printer.add_image(getattr(statistics, field), field)
-    
-    
+
+
 class FrameBuffer(object):
   def __init__(self, num_frames=1, shape=(640, 480, 3), dtype=np.uint8):
     # Create our frame buffers. We don't store them together because while it
@@ -91,7 +96,7 @@ class FrameBuffer(object):
   # Useful for debugging.
   def get_buffers(self):
     return cv2.hconcat(self._frames), cv2.hconcat(self._frames_gray)
-  
+
 
 class FramePrinter(object):
   def __init__(self):
@@ -126,8 +131,8 @@ class FramePrinter(object):
       current_col += cols + space
 
     return combined_image
-      
-    
+
+
 
 def get_region_as_mask(rows, cols, region):
   mask = np.zeros((rows, cols), dtype=np.uint8)
@@ -144,3 +149,88 @@ def get_perspective_transform(rows, cols, region):
 
 # IMPORTANT!!! Subtraction will WRAP with uint8 if it goes negative!
 def trim_to_uint8(arr): return np.clip(arr, 0, 255).astype(np.uint8)
+
+
+def extrapolate(xy1, xy2):
+  x1, y1 = xy1
+  x2, y2 = xy2
+  vx = x2 - x1
+  vy = y2 - y1
+  return (x2 + vx, y2 + vy)
+def lerp(xy1, xy2):
+  x1, y1 = xy1
+  x2, y2 = xy2
+  return ((x1 + x2) / 2, (y1 + y2) / 2)
+def dist(xy1, xy2):
+  x1, y1 = xy1
+  x2, y2 = xy2
+  return (x2 - x1)**2 + (y2 - y1)**2
+def in_bounds(rows, cols, xy):
+  x, y = xy
+  return (x >= 0 and x < cols and y >= 0 and y < rows)
+
+# https://matplotlib.org/users/image_tutorial.html
+# http://jakevdp.github.io/mpl_tutorial/tutorial_pages/tut2.html
+def p_gray(*args, path=None):
+  imgs = list(args)
+  #plt.figure(figsize=(20,10))
+  fig, axs = plt.subplots(1, len(imgs), squeeze=False)
+  fig.set_size_inches(20, 10)
+  for img, ax in zip(imgs, axs[0]):
+    ax.imshow(img, cmap = 'gray')
+  if path: plt.savefig(path, bbox_inches='tight')
+  plt.show()
+def p_bgr(img, path=None):
+  plt.figure(figsize=(20,10))
+  plt.imshow(img[:,:,::-1])
+  if path: plt.savefig(path, bbox_inches='tight')
+  plt.show()
+def p_heat(img, path=None):
+  plt.figure(figsize=(20,10))
+  plt.imshow(1.0 * img / img.max(), cmap='hot', interpolation='nearest')
+  if path: plt.savefig(path, bbox_inches='tight')
+  plt.show()
+def p_histogram(img, path=None):
+  plt.hist(img, bins='auto')
+  if path: plt.savefig(path, bbox_inches='tight')
+  plt.show()
+
+def load_json_keypoints_as_dict(path):
+  with open(path, 'r') as keypoints_file:
+    frame_to_keypoints_str = json.load(keypoints_file)
+  frame_to_keypoints = {}
+  for frame_index_str, keypoints_str in frame_to_keypoints_str.items():
+    frame_to_keypoints[int(frame_index_str)] = [
+        [int(round(x)), int(round(y)), int(round(size))]
+        for x, y, size in keypoints_str]
+  assert set(frame_to_keypoints.keys()) == set(range(len(frame_to_keypoints)))
+  return frame_to_keypoints
+
+def get_all_frames_from_video(path):
+  cap = cv2.VideoCapture(path)
+  video_frames = []
+  while cap.isOpened():
+    grabbed, raw_frame = cap.read()
+    if not grabbed: break
+    video_frames.append(raw_frame)
+  cap.release()
+  return np.array(video_frames)
+
+def keypoints_to_mask(rows, cols, keypoints, fixed_radius=None):
+  mask = np.zeros([rows, cols], np.uint8)
+  for x, y, size in keypoints:
+    if fixed_radius: size = fixed_radius
+    cv2.circle(mask, (x, y), size, color=255, thickness=-1)
+  return mask
+
+def get_all_keypoint_masks(rows, cols, frame_to_keypoints, fixed_radius=None):
+  video_masks = []
+  for frame_index in sorted(frame_to_keypoints.keys()):
+    video_masks.append(keypoints_to_mask(rows, cols,
+                                         frame_to_keypoints[frame_index],
+                                         fixed_radius))
+  return np.array(video_masks)
+
+def hconcat_frames(frames):
+  num_frames, rows, cols = frames.shape[:3]
+  return frames.swapaxes(0, 1).reshape([rows, num_frames * cols])
