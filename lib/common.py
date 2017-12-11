@@ -220,7 +220,8 @@ def keypoints_to_mask(rows, cols, keypoints, fixed_radius=None):
   mask = np.zeros([rows, cols], np.uint8)
   for x, y, size in keypoints:
     if fixed_radius: size = fixed_radius
-    cv2.circle(mask, (x, y), size, color=255, thickness=-1)
+    if size == 1: mask[y, x] = 255
+    else: cv2.circle(mask, (x, y), size, color=255, thickness=-1)
   return mask
 
 def get_all_keypoint_masks(rows, cols, frame_to_keypoints, fixed_radius=None):
