@@ -1,0 +1,4 @@
+# https://www.learnopencv.com/install-opencv3-on-ubuntu/
+
+# virtualenv -p python3 virtualenvs/cv --no-site-packages
+
