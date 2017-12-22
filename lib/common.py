@@ -187,11 +187,12 @@ def p_bgr(img, path=None):
   plt.show()
 def p_heat(img, path=None):
   plt.figure(figsize=(20,10))
-  plt.imshow(1.0 * img / img.max(), cmap='hot', interpolation='nearest')
+  plt.imshow(1.0 * img / img.max(), cmap='inferno', interpolation='nearest')
   if path: plt.savefig(path, bbox_inches='tight')
   plt.show()
 def p_histogram(img, path=None):
-  plt.hist(img, bins='auto')
+  plt.figure(figsize=(6, 3))
+  plt.hist(img, bins=32)
   if path: plt.savefig(path, bbox_inches='tight')
   plt.show()
 
