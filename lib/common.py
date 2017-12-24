@@ -207,6 +207,12 @@ def load_json_keypoints_as_dict(path):
   assert set(frame_to_keypoints.keys()) == set(range(len(frame_to_keypoints)))
   return frame_to_keypoints
 
+def load_json_keypoints_as_list(path):
+  # The dict is guaranteed to be dense, but potentially out of order.
+  # Here we sort them and return as a list of lists.
+  keypoints_dict = load_json_keypoints_as_dict(path)
+  return [keypoints_dict[frame_ix] for frame_ix in sorted(keypoints_dict.keys())]
+
 def get_all_frames_from_video(path):
   cap = cv2.VideoCapture(path)
   video_frames = []
@@ -217,22 +223,24 @@ def get_all_frames_from_video(path):
   cap.release()
   return np.array(video_frames)
 
-def keypoints_to_mask(rows, cols, keypoints, fixed_radius=None):
+def keypoints_to_mask(rows, cols, keypoints, fixed_radius=None, thickness=-1):
   mask = np.zeros([rows, cols], np.uint8)
   for x, y, size in keypoints:
     if fixed_radius: size = fixed_radius
     if size == 1: mask[y, x] = 255
-    else: cv2.circle(mask, (x, y), size, color=255, thickness=-1)
+    else: cv2.circle(mask, (x, y), size, color=255, thickness=thickness)
   return mask
 
-def get_all_keypoint_masks(rows, cols, frame_to_keypoints, fixed_radius=None):
+def get_all_keypoint_masks(rows, cols, frame_to_keypoints_list, fixed_radius=None, thickness=-1):
   video_masks = []
-  for frame_index in sorted(frame_to_keypoints.keys()):
-    video_masks.append(keypoints_to_mask(rows, cols,
-                                         frame_to_keypoints[frame_index],
-                                         fixed_radius))
+  for keypoints in frame_to_keypoints_list:
+    video_masks.append(keypoints_to_mask(rows, cols, keypoints, fixed_radius,
+                                         thickness))
   return np.array(video_masks)
 
 def hconcat_frames(frames):
   num_frames, rows, cols = frames.shape[:3]
   return frames.swapaxes(0, 1).reshape([rows, num_frames * cols])
+
+def add_bgr_and_gray(img_color, img_gray):
+  return cv2.add(img_color, cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR))
