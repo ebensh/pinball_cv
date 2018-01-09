@@ -1,16 +1,17 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # Tracks all pinball-ish blobs across a pinball playfield video, outputting a
 # json dictionary of frame number -> keypoint triples (x, y, size).
 
 import argparse
-import common
-import ConfigParser
+import configparser
 import cv2
 import itertools
 import json
 import numpy as np
 
+from lib import common
+from lib import pinball_types
 
 class OutputSegment(object):
   @staticmethod
@@ -49,7 +50,7 @@ class OutputSegment(object):
     # Do blob detection and dictionary updating here.
     # IMPORTANT! The frame should have BLACK objects on WHITE background.
     keypoints = self._detector.detect(frame)
-    print keypoints
+    print(keypoints)
     self._frame_to_keypoints[frame_index] = [
       (kp.pt[0], kp.pt[1], kp.size) for kp in keypoints]
 
@@ -60,9 +61,7 @@ class OutputSegment(object):
 
 
 def main():
-  FRAME_BUFFER_SIZE = 9
-  CURRENT_FRAME_INDEX = FRAME_BUFFER_SIZE/2
-  game_config = ConfigParser.ConfigParser()
+  game_config = configparser.ConfigParser()
   game_config.read(args.game_config)
   input_rows = game_config.getint('PinballFieldVideo', 'rows')
   input_cols = game_config.getint('PinballFieldVideo', 'cols')
@@ -71,38 +70,60 @@ def main():
   keypoints_path = game_config.get('PinballFieldVideo', 'keypoints_path')
   keypoint_detector = OutputSegment(keypoints_path)
 
-  frame_buffer = common.FrameBuffer(FRAME_BUFFER_SIZE, (input_rows, input_cols, 3))
+  video = pinball_types.PinballVideo(common.get_all_frames_from_video(
+      game_config.get('PinballFieldVideo', 'path')), all_keypoints=None)
 
   if args.display_all_images:
     cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
     cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
     cv2.namedWindow('masks', cv2.WINDOW_NORMAL)
-  frame_index = 0
-  while cap.isOpened():
-    grabbed, raw_frame = cap.read()
-    if not grabbed: break
 
-    common.display_image(raw_frame, 'raw_frame', args.display_all_images)
-    frame_buffer.append(raw_frame)
+  for frame in video.frames:
+    common.display_image(frame.img, 'original', args.display_all_images)
+    lookback, lookahead = 2, 2
+    # Here we want an ndarray of the past and future in color and gray.
+    # Using simple slicing will return views.
+    # ndarray of 2 x rows x cols x 3
 
-    past = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2)
-    past_gray = frame_buffer.get_view(None, CURRENT_FRAME_INDEX - 2, color=False)
-    current_frame = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1)[0]
-    current_frame_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX, CURRENT_FRAME_INDEX + 1, color=False)[0]
-    #current_frame_hsv = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
-    future = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None)
-    future_gray = frame_buffer.get_view(CURRENT_FRAME_INDEX + 1 + 2, None, color=False)
+    # TODO: More elegantly handle the ix = 1 case, where past and future
+    # are not the same size (1 frame versus 2), making concatenation hard.
+    past_gray, past_stats = None, None
+    if frame.ix > 0:
+      start, end = max(frame.ix - lookback, 0), frame.ix
+      past = video.imgs[start:end]
+      past_gray = common.convert_bgr_planes_to_gray(past)
+      past_stats = common.get_named_statistics(past_gray)
+    print(past_stats)
 
-    past_stats = common.get_named_statistics(past_gray)
-    future_stats = common.get_named_statistics(future_gray)
+    future_gray, future_stats = None, None
+    if frame.ix < video.num_frames - 1:
+      start, end = frame.ix + 1, min(frame.ix + 1 + lookahead, video.num_frames)
+      future = video.imgs[start:end]
+      future_gray = common.convert_bgr_planes_to_gray(future)
+      future_stats = common.get_named_statistics(future_gray)
+    print(future_stats)
 
-    if frame_index % 3 == 0:
+    if past_gray is not None and future_gray is None:
+      future_gray = np.zeros_like(past_gray)
+    if future_gray is not None and past_gray is None:
+      past_gray = np.zeros_like(future_gray)
+      
+    # TODO: Once the size discrepancy is handled remove this check :)
+    if past_gray.shape == future_gray.shape:
       common.display_image(
-          cv2.vconcat([cv2.hconcat(past_gray), cv2.hconcat(future_gray)]),
+          np.concatenate(
+            [np.concatenate(past_gray, axis=1),
+             np.concatenate(future_gray, axis=1)],
+            axis=0),
           'combined', args.display_all_images)
-      past_stats_printer = common.FramePrinter()
-      common.print_statistics(past_stats, past_stats_printer)
-      common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+      break
+      
+    continue
+    past_stats_printer = common.FramePrinter()
+    common.print_statistics(past_stats, past_stats_printer)
+    common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
     
     # Subtract out the unchanging background (mean past, mean future) from current frame
     foreground_mask_past = np.absolute(current_frame_gray.astype(np.int16) - past_stats.mean.astype(np.int16))
@@ -157,7 +178,7 @@ def main():
     frame_index += 1
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
-  print 'Frames processed: %d' % frame_index
+  print('Frames processed: %d' % frame_index)
 
   cv2.destroyAllWindows()
   cap.release()

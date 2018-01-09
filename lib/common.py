@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from collections import namedtuple
 import cv2
 import inspect
@@ -42,14 +40,14 @@ def display_image(img, title=None, show=True):
 # TODO(ebensh): Add a wrapper class around the named tuple.
 #NamedStatistics = namedtuple('NamedStatistics', ['minimum', 'maximum', 'ptp', 'mean'])
 NamedStatistics = namedtuple('NamedStatistics', ['mean'])
-def get_named_statistics(frames):
-  #minimum = np.amin(frames, axis=0)
-  #maximum = np.amax(frames, axis=0)
+def get_named_statistics(planes):
+  #minimum = np.amin(planes, axis=0)
+  #maximum = np.amax(planes, axis=0)
   return NamedStatistics(
     #minimum=minimum,
     #maximum=maximum,
     #ptp=maximum - minimum,
-    mean=np.mean(frames, axis=0, dtype=np.float64).astype(np.uint8))
+    mean=np.mean(planes, axis=0, dtype=np.float64).astype(np.uint8))
     #median=cv2.convertScaleAbs(np.median(frames, axis=0)),
     #variance=cv2.convertScaleAbs(np.var(frames, axis=0, dtype=np.float64)))
 
@@ -57,7 +55,7 @@ def print_statistics(statistics, printer):
   for field in statistics._fields:
     printer.add_image(getattr(statistics, field), field)
 
-
+    
 class FrameBuffer(object):
   def __init__(self, num_frames=1, shape=(640, 480, 3), dtype=np.uint8):
     # Create our frame buffers. We don't store them together because while it
@@ -238,9 +236,15 @@ def get_all_keypoint_masks(rows, cols, frame_to_keypoints_list, fixed_radius=Non
                                          thickness))
   return np.array(video_masks)
 
-def hconcat_frames(frames):
-  num_frames, rows, cols = frames.shape[:3]
-  return frames.swapaxes(0, 1).reshape([rows, num_frames * cols])
+def hconcat_ndarray(imgs):
+  num_imgs, rows, cols = imgs.shape[:3]
+  return imgs.swapaxes(0, 1).reshape([rows, num_imgs * cols])
+
+def convert_bgr_planes_to_gray(planes):
+  plns, rows, cols, chs = planes.shape
+  flattened = planes.reshape((plns * rows, cols, chs))
+  flattened_gray = cv2.cvtColor(flattened, cv2.COLOR_BGR2GRAY)
+  return flattened_gray.reshape((plns, rows, cols))
 
 def add_bgr_and_gray(img_color, img_gray):
   return cv2.add(img_color, cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR))
