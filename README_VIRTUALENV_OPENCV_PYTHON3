@@ -2,3 +2,4 @@
 
 # virtualenv -p python3 virtualenvs/cv --no-site-packages
 
+# workon cv
