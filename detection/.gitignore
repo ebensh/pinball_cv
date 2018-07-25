@@ -1,0 +1,3 @@
+#Once things get too large, enable this and move them elsewhere:
+#videos/*/original_video.webm
+#videos/*/original_video.webm.bak
