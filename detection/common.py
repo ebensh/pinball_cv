@@ -195,8 +195,11 @@ def p_histogram(img, path=None):
   plt.show()
 
 def load_json_keypoints_as_dict(path):
-  with open(path, 'r') as keypoints_file:
-    frame_to_keypoints_str = json.load(keypoints_file)
+  try:
+    with open(path, 'r') as keypoints_file:
+      frame_to_keypoints_str = json.load(keypoints_file)
+  except IOError as e:
+    return {}
   frame_to_keypoints = {}
   for frame_index_str, keypoints_str in frame_to_keypoints_str.items():
     frame_to_keypoints[int(frame_index_str)] = [
