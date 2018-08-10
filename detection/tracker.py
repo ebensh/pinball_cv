@@ -87,32 +87,25 @@ def main():
 
     # TODO: More elegantly handle the ix = 1 case, where past and future
     # are not the same size (1 frame versus 2), making concatenation hard.
-    past_gray, past_stats = None, None
+    past_gray = None
     if frame.ix > 0:
       start = max(frame.ix - lookback, 0)
       end = frame.ix
-      past = video.imgs[start:end]
+      past_gray = video.imgs_gray[start:end]
     else:
-      past = np.zeros_like(video.imgs[frame.ix:frame.ix+1])
-    past_gray = common.convert_bgr_planes_to_gray(past)
+      past_gray = np.zeros_like(video.imgs_gray[frame.ix:frame.ix+1])
     past_stats = common.get_named_statistics(past_gray)
-    print(past_stats)
+    #print(past_stats)
 
-    future_gray, future_stats = None, None
+    future_gray = None
     if frame.ix < video.num_frames - 1:
       start = frame.ix + 1
       end = min(frame.ix + 1 + lookahead, video.num_frames)
-      future = video.imgs[start:end]
+      future_gray = video.imgs_gray[start:end]
     else:
-      future = np.zeros_like(video.imgs[frame.ix:frame.ix+1])
-    future_gray = common.convert_bgr_planes_to_gray(future)
+      future_gray = np.zeros_like(video.imgs_gray[frame.ix:frame.ix+1])
     future_stats = common.get_named_statistics(future_gray)
     print(future_stats)
-
-    if past_gray is not None and future_gray is None:
-      future_gray = np.zeros_like(past_gray)
-    if future_gray is not None and past_gray is None:
-      past_gray = np.zeros_like(future_gray)
       
     # TODO: Once the size discrepancy is handled remove this check :)
     if past_gray.shape == future_gray.shape:
