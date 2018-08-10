@@ -50,13 +50,13 @@ class OutputSegment(object):
     # Do blob detection and dictionary updating here.
     # IMPORTANT! The frame should have BLACK objects on WHITE background.
     keypoints = self._detector.detect(frame)
-    print(keypoints)
     self._frame_to_keypoints[frame_index] = [
       (kp.pt[0], kp.pt[1], kp.size) for kp in keypoints]
+    print(self._frame_to_keypoints[frame_index])
 
   def release(self):
     # Write the json keypoints.
-    with open(self._path, 'wb') as keypoints_file:
+    with open(self._path, 'w') as keypoints_file:
       json.dump(self._frame_to_keypoints, keypoints_file)
 
 
@@ -119,30 +119,27 @@ def main():
     past_stats_printer = common.FramePrinter()
     common.print_statistics(past_stats, past_stats_printer)
     common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-      break      
-    continue
     
-    # Subtract out the unchanging background (mean past, mean future) from current frame
-    foreground_mask_past = np.absolute(current_frame_gray.astype(np.int16) - past_stats.mean.astype(np.int16))
-    foreground_mask_future = np.absolute(current_frame_gray.astype(np.int16) - future_stats.mean.astype(np.int16))
+    # Subtract out the unchanging background (mean past, mean future) from current frame.
+    foreground_mask_past = cv2.absdiff(frame.img_gray, past_stats.mean)
+    foreground_mask_future = cv2.absdiff(frame.img_gray, future_stats.mean)
 
     # Threshold the differences and combine them.
     foreground_mask = np.logical_and(foreground_mask_past >= 25, foreground_mask_future >= 25)
 
     # Mask away the areas we know are changing based on thresholded ptp (ptp past, ptp future).
     # Take the absolute difference (per pixel) from the mean in each frame.
-    changing_mask_past = np.absolute(past_gray.astype(np.int16) - past_stats.mean.astype(np.int16)) >= 5
+    #changing_mask_past = np.absolute(past_gray.astype(np.int16) - past_stats.mean.astype(np.int16)) >= 5
     # Count how many frames were significantly different and threshold.
-    changing_mask_past = np.sum(changing_mask_past, axis=0) >= 3
+    #changing_mask_past = np.sum(changing_mask_past, axis=0) >= 3
     
     # Take the absolute difference (per pixel) from the mean in each frame.
-    changing_mask_future = np.absolute(future_gray.astype(np.int16) - future_stats.mean.astype(np.int16)) >= 5
+    #changing_mask_future = np.absolute(future_gray.astype(np.int16) - future_stats.mean.astype(np.int16)) >= 5
     # Count how many frames were significantly different.
-    changing_mask_future = np.sum(changing_mask_future, axis=0) >= 3
+    #changing_mask_future = np.sum(changing_mask_future, axis=0) >= 3
 
-    changing_mask = np.logical_or(changing_mask_past, changing_mask_future)
+    #changing_mask = np.logical_or(changing_mask_past, changing_mask_future)
+    changing_mask = np.zeros_like(frame.img_gray)
 
     # Create a mask from the HSV image to identify bright areas (high value).
     #lights_mask = np.uint8(255) * (current_frame_hsv[:,:,2] > 235)
@@ -172,12 +169,11 @@ def main():
       final_mask,
       final_mask_polished]), 'masks', args.display_all_images)
 
-    keypoint_detector.process_frame(cv2.bitwise_not(final_mask_polished), frame_index)  # Invert for blob detection.
+    keypoint_detector.process_frame(cv2.bitwise_not(final_mask_polished), frame.ix)  # Invert for blob detection.
+    print("Processed frame:", frame.ix)
 
-    frame_index += 1
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
-  print('Frames processed: %d' % frame_index)
 
   cv2.destroyAllWindows()
   cap.release()
