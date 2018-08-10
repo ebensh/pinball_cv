@@ -126,6 +126,11 @@ def main():
           print("Setting frame", i, "golden keypoint:", golden_keypoints[i])
           break
     i += 1
+  print("All done! :)")
+  with open(game_config.get('PinballFieldVideo', 'keypoints_golden_path'), 'w') as golden_keypoints_file:
+    json.dump(golden_keypoints, golden_keypoints_file)
+  cv2.destroyAllWindows()
+  return 0
         
 
 if __name__ == '__main__':
