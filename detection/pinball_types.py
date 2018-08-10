@@ -23,7 +23,10 @@ class PinballVideo:
   """Represents a pinball video."""
   def __init__(self, imgs, all_keypoints=None):
     self._imgs = imgs  # The raw video images (ndarray, disk mapped?).
-    self._imgs_gray = common.convert_bgr_planes_to_gray(imgs)
+    # We copy the converted ndarray here because without doing so they have
+    # a mysterious base object that isn't imgs but exists somewhere. I'd
+    # rather make a copy and know that this is where the memory is alloc'd. 
+    self._imgs_gray = common.convert_bgr_planes_to_gray(imgs).copy()
     if not all_keypoints:
       all_keypoints = [[]] * len(imgs)
     self._all_keypoints = all_keypoints  # Each image's keypoints (ndarray).
@@ -34,9 +37,7 @@ class PinballVideo:
 
       # Make sure it's a view, not a copy, when we use the properties.
       assert self.frames[i].img.base is self._imgs
-      # imgs_gray is not itself the base object! (whaaat XD)
-      # But fortunately they share a common base.
-      assert self.frames[i].img_gray.base is self._imgs_gray.base
+      assert self.frames[i].img_gray.base is self._imgs_gray
       assert np.may_share_memory(self.frames[i].img.base, self._imgs)
       assert np.may_share_memory(self.frames[i].img_gray.base, self._imgs_gray)
       assert not self.frames[i].img.flags['OWNDATA']
