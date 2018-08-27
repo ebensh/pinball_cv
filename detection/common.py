@@ -232,6 +232,18 @@ def keypoints_to_mask(rows, cols, keypoints, fixed_radius=None, thickness=-1):
     else: cv2.circle(mask, (x, y), size, color=255, thickness=thickness)
   return mask
 
+def colorize_mask(mask, bgr_tuple):
+  colorized_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+  colorized_mask[np.where((colorized_mask==[255,255,255]).all(axis=2))] = bgr_tuple
+  return colorized_mask
+
+# TODO: Convert this to a "overlay" method
+def draw_colorized_mask(img, mask, bgr_tuple):
+  inverse_mask = cv2.bitwise_not(mask)
+  colorized_mask = colorize_mask(mask, bgr_tuple)
+  img_with_mask_removed = cv2.bitwise_and(img, img, mask=inverse_mask)
+  return cv2.add(img_with_mask_removed, colorized_mask)
+
 def get_all_keypoint_masks(rows, cols, frame_to_keypoints_list, fixed_radius=None, thickness=-1):
   video_masks = []
   for keypoints in frame_to_keypoints_list:

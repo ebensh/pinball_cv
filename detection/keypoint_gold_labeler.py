@@ -116,13 +116,13 @@ def main():
               selected_keypoint = [x, y, size]
           if selected_keypoint:
             print("Setting frame", i, "golden keypoint:", selected_keypoint)
-            golden_keypoints[i] = selected_keypoint
+            golden_keypoints[i] = [selected_keypoint]
             break  # Go to the next frame
           else:
             # Must've been a missed click / not close enough.
             print("No keypoint detected close by, please try again.")
         elif window == WINDOW_COLOR_FRAME:
-          golden_keypoints[i] = mouse_xy + [PINBALL_RADIUS_PX]
+          golden_keypoints[i] = [mouse_xy + [PINBALL_RADIUS_PX]]
           print("Setting frame", i, "golden keypoint:", golden_keypoints[i])
           break
     i += 1
