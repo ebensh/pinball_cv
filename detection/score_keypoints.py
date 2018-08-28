@@ -71,8 +71,8 @@ def main():
   cv2.destroyAllWindows()
 
   if video.num_frames > 0:
-    score_correct_at_head /= video.num_frames
-    score_correct /= video.num_frames
+    score_correct_at_head = 100.0 * score_correct_at_head / video.num_frames
+    score_correct = 100.0 * score_correct / video.num_frames
   print("Final score: {0:.2f}% at head, {1:.2f}% anywhere".format(
       score_correct_at_head, score_correct))
 
