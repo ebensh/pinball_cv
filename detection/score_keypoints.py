@@ -38,23 +38,30 @@ def main():
   score_correct_at_head = 0.0
   # Correctly identified regardless of order.
   score_correct = 0.0
+  # Number of frames that have a golden keypoint are "scorable".
+  num_scorable_frames = 0
   
   if args.display_all_images:
     cv2.namedWindow('frame_with_keypoints', cv2.WINDOW_NORMAL)
 
   for frame in video.frames:
-    is_golden_keypoint = [kp in frame.golden_keypoints
-                          for kp in frame.keypoints]
-    num_correct_at_head = len(list(itertools.takewhile(lambda x: x == True,
-                                                       is_golden_keypoint)))
-    num_correct = sum(is_golden_keypoint)
+    if frame.golden_keypoints:
+      num_scorable_frames += 1
+      is_golden_keypoint = [kp in frame.golden_keypoints
+                            for kp in frame.keypoints]
+      num_correct_at_head = len(list(itertools.takewhile(lambda x: x == True,
+                                                         is_golden_keypoint)))
+      num_correct = sum(is_golden_keypoint)
 
-    score_correct_at_head += float(num_correct_at_head) / len(frame.golden_keypoints)
-    score_correct += float(num_correct) / len(frame.golden_keypoints)    
+      score_correct_at_head += float(num_correct_at_head) / len(frame.golden_keypoints)
+      score_correct += float(num_correct) / len(frame.golden_keypoints)
 
     if args.display_all_images:
-      print("Frame {0}: {1}/{3} at head, {2}/{3} anywhere".format(
-        frame.ix, num_correct_at_head, num_correct, len(frame.golden_keypoints)))
+      if frame.golden_keypoints:
+        print("Frame {0}: {1}/{3} at head, {2}/{3} anywhere".format(
+            frame.ix, num_correct_at_head, num_correct, len(frame.golden_keypoints)))
+      else:
+        print("Frame {0} is not scorable (no golden keypoints)".format(frame.ix))
     
       img = frame.img.copy()
 
@@ -70,9 +77,9 @@ def main():
 
   cv2.destroyAllWindows()
 
-  if video.num_frames > 0:
-    score_correct_at_head = 100.0 * score_correct_at_head / video.num_frames
-    score_correct = 100.0 * score_correct / video.num_frames
+  if num_scorable_frames > 0:
+    score_correct_at_head = 100.0 * score_correct_at_head / num_scorable_frames
+    score_correct = 100.0 * score_correct / num_scorable_frames
   print("Final score: {0:.2f}% at head, {1:.2f}% anywhere".format(
       score_correct_at_head, score_correct))
 
