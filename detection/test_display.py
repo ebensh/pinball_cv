@@ -4,11 +4,11 @@ import cv2
 import numpy as np
 
 import common
-import display
+from display import Display
 import pinball_types
 
 def main():
-  d = display.Display({
+  display = Display({
     'original': True,
     'gray': False,
     'background': True,
@@ -21,9 +21,9 @@ def main():
 
   for frame in video.frames:
     print(frame.ix)
-    d.Clear()
-    d.Add('original', frame.img)
-    d.Add('gray', frame.img_gray)
+    display.Clear()
+    display.Add('original', frame.img)
+    display.Add('gray', frame.img_gray)
 
     background = np.zeros_like(frame.img, dtype=np.float32)
     alpha = 0.9
@@ -32,15 +32,15 @@ def main():
       print(np.min(background), np.max(background))
     background = cv2.convertScaleAbs(background)
     print(np.min(background), np.max(background))
-    d.Add('background', background)
+    display.Add('background', background)
 
     processed = cv2.absdiff(frame.img, background)
     print(np.min(processed), np.max(processed), np.sum(frame.img-background))
-    d.Add('processed', processed)
+    display.Add('processed', processed)
 
     mask = np.uint8(255) * (processed > 25)
     print(mask.dtype, np.sum(mask))
-    d.Add('mask', mask)
+    display.Add('mask', mask)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
       break
