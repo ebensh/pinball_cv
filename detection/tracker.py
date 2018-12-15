@@ -11,6 +11,7 @@ import json
 import numpy as np
 
 import common
+from display import Display
 import pinball_types
 
 class OutputSegment(object):
@@ -73,13 +74,16 @@ def main():
   video = pinball_types.PinballVideo(common.get_all_frames_from_video(
       game_config.get('PinballFieldVideo', 'path')), all_keypoints=None)
 
-  if args.display_all_images:
-    cv2.namedWindow('past_stats', cv2.WINDOW_NORMAL)
-    cv2.namedWindow('combined', cv2.WINDOW_NORMAL)
-    cv2.namedWindow('masks', cv2.WINDOW_NORMAL)
+  display = Display({
+    'original': True and args.display_all_images,
+    'combined': True and args.display_all_images,
+    'past_stats': True and args.display_all_images,
+    'masks': True and args.display_all_images
+  })
 
   for frame in video.frames:
-    common.display_image(frame.img, 'original', args.display_all_images)
+    display.Clear()
+    display.Add('original', frame.img)
     lookback, lookahead = 2, 2
     # Here we want an ndarray of the past and future in color and gray.
     # Using simple slicing will return views.
@@ -105,20 +109,18 @@ def main():
     else:
       future_gray = np.zeros_like(video.imgs_gray[frame.ix:frame.ix+1])
     future_stats = common.get_named_statistics(future_gray)
-    print(future_stats)
+    #print(future_stats)
       
     # TODO: Once the size discrepancy is handled remove this check :)
     if past_gray.shape == future_gray.shape:
-      common.display_image(
-          np.concatenate(
-            [np.concatenate(past_gray, axis=1),
-             np.concatenate(future_gray, axis=1)],
-            axis=0),
-          'combined', args.display_all_images)
+      display.Add('combined', 
+          np.concatenate([np.concatenate(past_gray, axis=1),
+                          np.concatenate(future_gray, axis=1)],
+                          axis=0))
 
     past_stats_printer = common.FramePrinter()
     common.print_statistics(past_stats, past_stats_printer)
-    common.display_image(past_stats_printer.get_combined_image(), 'past_stats', args.display_all_images)
+    display.Add('past_stats', past_stats_printer.get_combined_image())
     
     # Subtract out the unchanging background (mean past, mean future) from current frame.
     foreground_mask_past = cv2.absdiff(frame.img_gray, past_stats.mean)
@@ -163,11 +165,11 @@ def main():
     final_mask_polished = cv2.dilate(final_mask_polished, kernel, iterations=2)
     #final_mask_polished = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel)
     
-    common.display_image(np.hstack([
-      np.uint8(255) * foreground_mask,
-      np.uint8(255) * changing_mask,
-      final_mask,
-      final_mask_polished]), 'masks', args.display_all_images)
+    display.Add('masks', np.hstack([
+        np.uint8(255) * foreground_mask,
+        np.uint8(255) * changing_mask,
+        final_mask,
+        final_mask_polished]))
 
     keypoint_detector.process_frame(cv2.bitwise_not(final_mask_polished), frame.ix)  # Invert for blob detection.
     print("Processed frame:", frame.ix)
