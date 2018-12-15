@@ -16,7 +16,7 @@ def main():
     'mask': True,
   })
 
-  path = '/home/monk/src/pinball_cv/detection/videos/2017_11_29_hot_hand_mike/pinball_field_video.avi'
+  path = 'videos/2017_11_29_hot_hand_mike/pinball_field_video.avi'
   video = pinball_types.PinballVideo(common.get_all_frames_from_video(path), all_keypoints=None)
 
   for frame in video.frames:
@@ -38,12 +38,11 @@ def main():
     print(np.min(processed), np.max(processed), np.sum(frame.img-background))
     d.Add('processed', processed)
 
-    
     mask = np.uint8(255) * (processed > 25)
     print(mask.dtype, np.sum(mask))
     d.Add('mask', mask)
 
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('q'):
       break
 
   cv2.destroyAllWindows()
