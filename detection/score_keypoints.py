@@ -17,6 +17,13 @@ import common
 import pinball_types
 
 
+def is_within(point, container_points):
+  for container_point in container_points:
+    if common.dist(point[:2], container_point[:2]) < container_point[2]:
+      return True
+  return False
+
+
 def main():
   game_config = configparser.ConfigParser()
   game_config.read(args.game_config)
@@ -47,11 +54,12 @@ def main():
   for frame in video.frames:
     if frame.golden_keypoints:
       num_scorable_frames += 1
-      is_golden_keypoint = [kp in frame.golden_keypoints
-                            for kp in frame.keypoints]
+
+      matches_golden_keypoint = [is_within(kp, frame.golden_keypoints)
+                                 for kp in frame.keypoints]
       num_correct_at_head = len(list(itertools.takewhile(lambda x: x == True,
-                                                         is_golden_keypoint)))
-      num_correct = sum(is_golden_keypoint)
+                                                         matches_golden_keypoint)))
+      num_correct = sum(matches_golden_keypoint)
 
       score_correct_at_head += float(num_correct_at_head) / len(frame.golden_keypoints)
       score_correct += float(num_correct) / len(frame.golden_keypoints)
@@ -65,8 +73,8 @@ def main():
     
       img = frame.img.copy()
 
-      keypoints_mask = common.keypoints_to_mask(input_rows, input_cols, frame.keypoints)
-      golden_keypoints_mask = common.keypoints_to_mask(input_rows, input_cols, frame.golden_keypoints)
+      keypoints_mask = common.keypoints_to_mask(input_rows, input_cols, frame.keypoints, fixed_radius=5)
+      golden_keypoints_mask = common.keypoints_to_mask(input_rows, input_cols, frame.golden_keypoints, fixed_radius=3)
       img = common.draw_colorized_mask(img, keypoints_mask, (255, 0, 255))
       img = common.draw_colorized_mask(img, golden_keypoints_mask, (0, 255, 255))
 
